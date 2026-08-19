@@ -47,15 +47,11 @@ Medicine_Notifier/
 │   ├── scripts/               create_db.py · smoke_test.py
 │   └── requirements.txt
 │
-├── web/                       marketing site — React + Vite + react-router
-│   ├── src/pages/             Home · About · Features · How It Works ·
-│   │                          Contact · Login · Signup · Legal
-│   ├── src/components/        header, footer, shared UI
-│   └── package.json
-│
-└── website/                   user manual — one static HTML page
-    ├── index.html
-    └── assets/                screenshots of every screen
+└── web/                       marketing site — React + Vite + react-router
+    ├── src/pages/             Home · About · Features · How It Works ·
+    │                          Contact · Login · Signup · Legal
+    ├── src/components/        header, footer, shared UI
+    └── package.json
 ```
 
 ## The three things you run
@@ -68,9 +64,6 @@ Medicine_Notifier/
 
 Start the backend first — the app and the website's login/contact forms both
 call it. The website and the app are independent of each other.
-
-`website/` (the single-page manual) needs no server at all: `start
-website\index.html`.
 
 ## First-time setup
 
@@ -155,8 +148,9 @@ site's address listed in `CORS_ALLOWED_ORIGINS` in
 - **Medicines** — search and filter the list, add, edit and delete. Typing a
   name queries the shared catalog in PostgreSQL, so "para" offers Paracetamol
   500 mg, 650 mg and the syrup, and picking one fills in the dosage.
-- **History & insights** — a week strip, a stacked chart of taken / skipped /
-  missed doses, a trend against the previous period, and every recorded dose.
+- **History & insights** — the week as seven tick-boxes with a progress bar, an
+  adherence ring with the trend against the previous period, an adherence chart
+  over longer ranges, and every recorded dose.
 - **Profile & settings** — display name, dark mode, alarm sound and volume,
   password change, and CSV export of the full dose history via the share sheet.
 - **Reminders** — each medicine time is scheduled with the OS, so a dose rings
