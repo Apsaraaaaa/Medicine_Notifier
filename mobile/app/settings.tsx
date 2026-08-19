@@ -26,7 +26,7 @@ import {
 const MIN_PASSWORD = 8;
 
 export default function SettingsScreen() {
-  const { settings, updateSettings, changePassword, medicines } = useApp();
+  const { settings, updateSettings, changePassword, remindersScheduled } = useApp();
   const c = useTheme();
   const router = useRouter();
 
@@ -38,7 +38,7 @@ export default function SettingsScreen() {
   const testTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // What the phone is actually holding, so this screen can answer "are my
   // reminders set?" without anyone having to take it on trust.
-  const [status, setStatus] = useState<{ scheduled: number; allowed: boolean } | null>(null);
+  const [allowed, setAllowed] = useState<boolean | null>(null);
 
   // Leaving the screen must not leave the test alarm ringing.
   useEffect(() => {
@@ -50,11 +50,11 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     let live = true;
-    reminderStatus().then((s) => live && setStatus(s));
+    reminderStatus().then((s) => live && setAllowed(s.allowed));
     return () => {
       live = false;
     };
-  }, [settings.notifications, medicines]);
+  }, [settings.notifications, remindersScheduled]);
 
   const testAlarm = () => {
     if (testing) {
@@ -158,23 +158,19 @@ export default function SettingsScreen() {
             value={`${SNOOZE_MINUTES} min`}
           />
           <SettingsRow
-            icon={status?.allowed === false ? "notifications-off" : "alarm-on"}
+            icon={allowed === false ? "notifications-off" : "alarm-on"}
             label="Reminders on this phone"
             description={
-              status === null
-                ? "Checking…"
-                : !status.allowed
-                  ? "Android is blocking notifications for this app"
-                  : status.scheduled === 0
-                    ? "Nothing scheduled — add a medicine with a time"
-                    : "Set to ring even when the app is closed"
+              allowed === false
+                ? "Android is blocking notifications — tap to allow"
+                : remindersScheduled === 0
+                  ? "Nothing scheduled — add a medicine with a time"
+                  : "Set to ring even when the app is closed"
             }
-            value={status === null ? "" : status.allowed ? String(status.scheduled) : "Off"}
+            value={allowed === false ? "Off" : String(remindersScheduled)}
             onPress={
-              status?.allowed === false
-                ? () => {
-                    requestPermission().then(() => reminderStatus().then(setStatus));
-                  }
+              allowed === false
+                ? () => requestPermission().then((ok) => setAllowed(ok))
                 : undefined
             }
           />

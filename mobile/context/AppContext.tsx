@@ -41,6 +41,8 @@ interface AppContextValue {
   activeReminder: ActiveReminder | null;
   authLoading: boolean;
   refreshing: boolean;
+  /** Reminders the phone is currently holding, after the last sync. */
+  remindersScheduled: number;
   // auth
   register: (name: string, email: string, password: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
@@ -82,6 +84,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activeReminder, setActiveReminder] = useState<ActiveReminder | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [remindersScheduled, setRemindersScheduled] = useState(0);
 
   const firedRef = useRef<Set<string>>(new Set());
   const snoozeRef = useRef<Map<string, number>>(new Map()); // key -> timestamp to fire
@@ -270,7 +273,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ---- OS notifications: keep the device schedule in step with the data ----
   useEffect(() => {
     if (!token) return;
-    syncScheduledReminders(medicines, settings.notifications);
+    let live = true;
+    // The count is published only once the scheduling has actually finished,
+    // so Settings can never read it mid-flight and report zero.
+    syncScheduledReminders(medicines, settings.notifications).then((n) => {
+      if (live) setRemindersScheduled(n);
+    });
+    return () => {
+      live = false;
+    };
   }, [token, medicines, settings.notifications]);
 
   // ---- tapping a notification reopens the dose sheet ----
@@ -350,6 +361,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       activeReminder,
       authLoading,
       refreshing,
+      remindersScheduled,
       register,
       login,
       logout,
@@ -374,6 +386,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       activeReminder,
       authLoading,
       refreshing,
+      remindersScheduled,
       register,
       login,
       logout,
