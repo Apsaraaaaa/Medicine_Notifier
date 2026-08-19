@@ -1,0 +1,9 @@
+﻿Django==5.2.17
+djangorestframework==3.18.0
+djangorestframework-simplejwt==5.5.1
+django-cors-headers==4.9.0
+python-dotenv==1.2.3
+
+# PostgreSQL driver (psycopg 3). The [binary] extra ships prebuilt wheels, so
+# no local libpq or C compiler is needed.
+psycopg[binary]==3.3.4

@@ -1,0 +1,17 @@
+# --- mobile ---
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/android/
+mobile/ios/
+mobile/.env.local
+
+# --- backend ---
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.env
+backend/staticfiles/
+
+*.log
+.DS_Store
