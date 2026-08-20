@@ -3,11 +3,13 @@ import { useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { RADIUS, SNOOZE_MINUTES } from "../constants/theme";
+import { RADIUS } from "../constants/theme";
 import { useApp, useTheme } from "../context/AppContext";
 import type { HistoryStatus } from "../types";
 import { formatTime12, prettyDate, shortDate, todayISO } from "../utils/date";
 import { withAlpha } from "../utils/color";
+import { mealSummary } from "../utils/meal";
+import { PatientReminder } from "./patient/PatientReminder";
 import { Button, IconButton, T, TextArea } from "./ui";
 
 /**
@@ -15,14 +17,22 @@ import { Button, IconButton, T, TextArea } from "./ui";
  * which is what updates the home stats and adherence.
  */
 export function ReminderSheet() {
-  const { activeReminder, respondReminder, snoozeReminder } = useApp();
+  const { activeReminder, respondReminder, snoozeReminder, snoozeMinutes, patientMode, t } =
+    useApp();
   const c = useTheme();
   const insets = useSafeAreaInsets();
   const [note, setNote] = useState("");
   const [showNote, setShowNote] = useState(false);
 
+  // Patient Mode answers the same dose with the same two calls, through a
+  // sheet that offers only the two answers. Swapped here rather than inside
+  // the layout so neither version has to carry the other's branches.
+  if (patientMode) return <PatientReminder />;
+
   if (!activeReminder) return null;
   const { medicine, time, date } = activeReminder;
+  // "Breakfast - After meal": what actually tells you how to take it.
+  const mealText = mealSummary(medicine, t);
 
   const answer = (status: HistoryStatus) => {
     respondReminder(status, note);
@@ -52,7 +62,7 @@ export function ReminderSheet() {
           <View style={styles.closeRow}>
             <IconButton
               icon="close"
-              label={`Close and snooze ${SNOOZE_MINUTES} minutes`}
+              label={t("reminder.closeSnooze", { minutes: snoozeMinutes })}
               onPress={snooze}
             />
           </View>
@@ -64,7 +74,7 @@ export function ReminderSheet() {
               </View>
 
               <T size={22} weight="700" center style={{ marginTop: 14 }}>
-                It&apos;s time for your dose
+                {t("reminder.title")}
               </T>
 
               <View style={styles.medRow}>
@@ -78,6 +88,11 @@ export function ReminderSheet() {
                 </T>
               </View>
               <T tone="ink2">{medicine.dosage}</T>
+              {mealText ? (
+                <T size={15} tone="brandInk" weight="700" center style={{ marginTop: 4 }}>
+                  {mealText}
+                </T>
+              ) : null}
 
               <View
                 style={[styles.when, { backgroundColor: c.surface2, borderColor: c.line }]}
@@ -86,7 +101,9 @@ export function ReminderSheet() {
                   {formatTime12(time)}
                 </T>
                 <T size={15} tone="ink3" center>
-                  {date === todayISO() ? `Today, ${shortDate(date)}` : prettyDate(date)}
+                  {date === todayISO()
+                    ? `${t("common.today")}, ${shortDate(date)}`
+                    : prettyDate(date)}
                 </T>
               </View>
 
@@ -102,9 +119,9 @@ export function ReminderSheet() {
             {showNote && (
               <View style={{ marginTop: 16 }}>
                 <TextArea
-                  label="Note (optional)"
+                  label={t("reminder.note")}
                   rows={2}
-                  placeholder="e.g. Taken with food"
+                  placeholder={t("reminder.notePlaceholder")}
                   value={note}
                   onChangeText={setNote}
                 />
@@ -113,22 +130,22 @@ export function ReminderSheet() {
 
             <View style={styles.actions}>
               <Button size="lg" icon="check" onPress={() => answer("taken")}>
-                I&apos;ve taken this dose
+                {t("reminder.taken")}
               </Button>
               <Button variant="secondary" icon="close" onPress={() => answer("skipped")}>
-                Skip this dose
+                {t("reminder.skip")}
               </Button>
               {/* Recording a miss explicitly beats leaving it to be inferred an
                   hour later: the history says what happened, not what expired. */}
               <Button variant="secondary" icon="warning-amber" onPress={() => answer("missed")}>
-                I missed this dose
+                {t("reminder.missed")}
               </Button>
               <Button variant="secondary" icon="snooze" onPress={snooze}>
-                {`Snooze ${SNOOZE_MINUTES} minutes`}
+                {t("reminder.snooze", { minutes: snoozeMinutes })}
               </Button>
               {!showNote && (
                 <Button variant="ghost" icon="edit-note" onPress={() => setShowNote(true)}>
-                  Add note
+                  {t("reminder.addNote")}
                 </Button>
               )}
             </View>

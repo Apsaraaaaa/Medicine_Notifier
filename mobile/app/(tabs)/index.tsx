@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DoseTimeline } from "../../components/DoseTimeline";
 import { NextDoseCard } from "../../components/NextDoseCard";
+import { PatientHome } from "../../components/patient/PatientHome";
 import { StatCard } from "../../components/StatCard";
 import {
   AdherenceRing,
@@ -16,36 +17,35 @@ import {
   SectionTitle,
   T,
 } from "../../components/ui";
-import { useApp, useTheme } from "../../context/AppContext";
+import { useApp, useTheme, useTodaySlots } from "../../context/AppContext";
+import type { TranslationKey } from "../../i18n";
+import { longDate } from "../../utils/date";
 import { adherenceVerdict } from "../../utils/insights";
-import { getTodaySlots, type DoseSlot } from "../../utils/schedule";
-
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 18) return "Good afternoon";
-  return "Good evening";
-}
-
-const todayLabel = () =>
-  new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+import type { DoseSlot } from "../../utils/schedule";
 
 type Filter = "all" | "taken" | "upcoming" | "missed";
 
-const FILTER_LABEL: Record<Exclude<Filter, "all">, string> = {
-  taken: "taken",
-  upcoming: "upcoming",
-  missed: "missed",
+const FILTER_LABEL: Record<Exclude<Filter, "all">, TranslationKey> = {
+  taken: "status.taken",
+  upcoming: "status.upcoming",
+  missed: "status.missed",
 };
 
 export default function DashboardScreen() {
-  const { user, medicines, history, triggerReminder, refresh, refreshing } = useApp();
+  const { user, medicines, triggerReminder, refresh, refreshing, patientMode, t } = useApp();
   const c = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<Filter>("all");
 
-  const slots = getTodaySlots(medicines, history);
+  const greeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return t("home.morning");
+    if (h < 18) return t("home.afternoon");
+    return t("home.evening");
+  };
+
+  const slots = useTodaySlots();
   const taken = slots.filter((s) => s.status === "taken").length;
   const upcoming = slots.filter((s) => s.status === "upcoming" || s.status === "due").length;
   const missed = slots.filter((s) => s.status === "missed").length;
@@ -69,6 +69,12 @@ export default function DashboardScreen() {
   const answer = (slot: DoseSlot) => triggerReminder(slot.medicine, slot.time);
   const openMedicine = (id: string) => router.push(`/medicine/${id}`);
   const toggle = (key: Filter) => setFilter((f) => (f === key ? "all" : key));
+  const filterWord = filter === "all" ? "" : t(FILTER_LABEL[filter]).toLowerCase();
+
+  // Patient Mode replaces this screen wholesale. Everything above still runs
+  // and costs nothing — the hooks have to be called unconditionally, and the
+  // work is a few array passes over one day of doses.
+  if (patientMode) return <PatientHome />;
 
   return (
     <ScrollView
@@ -82,17 +88,17 @@ export default function DashboardScreen() {
           white cards below have an edge to sit against */}
       <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={[styles.kicker, { color: c.ink3 }]}>{todayLabel().toUpperCase()}</Text>
+          <Text style={[styles.kicker, { color: c.ink3 }]}>{longDate().toUpperCase()}</Text>
           <Text style={[styles.greeting, { color: c.ink2 }]}>{greeting()},</Text>
           <Text style={[styles.name, { color: c.ink }]} numberOfLines={1}>
-            {user?.name || "Friend"}
+            {user?.name || t("home.friend")}
           </Text>
         </View>
 
         {needsAnswer.length > 0 && (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${needsAnswer.length} dose${needsAnswer.length > 1 ? "s" : ""} need an answer`}
+            accessibilityLabel={t("home.needsAnswer", { count: needsAnswer.length })}
             onPress={() => answer(needsAnswer[0])}
             style={[styles.bell, { backgroundColor: c.surface, borderColor: c.line }]}
           >
@@ -111,11 +117,11 @@ export default function DashboardScreen() {
           <Card>
             <EmptyState
               icon="event-available"
-              title="No medicines yet"
-              subtitle="Add your first medicine and we'll remind you at the right time, every time."
+              title={t("home.noMedicines")}
+              subtitle={t("home.noMedicinesHint")}
               action={
                 <Button icon="add" onPress={() => router.push("/medicine/new")}>
-                  Add medicine
+                  {t("nav.addMedicine")}
                 </Button>
               }
             />
@@ -139,10 +145,13 @@ export default function DashboardScreen() {
                     size={26}
                     color={allDone ? c.okInk : c.ink3}
                   />
-                  <T size={17} weight={allDone ? "600" : "400"} tone={allDone ? "okInk" : "ink2"} style={{ flex: 1 }}>
-                    {allDone
-                      ? "All done for today — nice work staying on track."
-                      : "You're all set for today — no doses scheduled."}
+                  <T
+                    size={17}
+                    weight={allDone ? "600" : "400"}
+                    tone={allDone ? "okInk" : "ink2"}
+                    style={{ flex: 1 }}
+                  >
+                    {allDone ? t("home.allDone") : t("home.nothingToday")}
                   </T>
                 </View>
               </Card>
@@ -154,7 +163,7 @@ export default function DashboardScreen() {
             <Card style={{ padding: 12 }}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Today's consistency. Open history and insights"
+                accessibilityLabel={t("home.openConsistency")}
                 onPress={() => router.push("/history")}
                 style={styles.ringRow}
               >
@@ -164,8 +173,8 @@ export default function DashboardScreen() {
                   value={adherence === null ? null : adherence / 100}
                   label={
                     adherence === null
-                      ? "No doses scheduled today"
-                      : `${adherence}% of today's doses taken`
+                      ? t("home.nothingScheduled")
+                      : t("home.dosesTaken", { taken, total: slots.length })
                   }
                 >
                   <Text style={{ fontSize: 16, fontWeight: "700", color: c.ink }}>
@@ -175,12 +184,12 @@ export default function DashboardScreen() {
 
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <T size={18} weight="700">
-                    Today&apos;s consistency
+                    {t("home.consistency")}
                   </T>
                   <T size={15} tone="ink2" numberOfLines={1}>
                     {adherence === null
-                      ? "Nothing scheduled"
-                      : `${adherenceVerdict(adherence)} · ${taken} of ${slots.length} doses`}
+                      ? t("home.nothingScheduled")
+                      : `${t(adherenceVerdict(adherence))} · ${t("home.dosesTaken", { taken, total: slots.length })}`}
                   </T>
                 </View>
 
@@ -190,29 +199,26 @@ export default function DashboardScreen() {
               <View style={styles.tiles}>
                 <StatCard
                   icon="check-circle"
-                  label="Taken"
+                  label={t("status.taken")}
                   value={taken}
                   tone="okInk"
                   selected={filter === "taken"}
-                  hint="Show only taken doses"
                   onPress={() => toggle("taken")}
                 />
                 <StatCard
                   icon="schedule"
-                  label="Upcoming"
+                  label={t("status.upcoming")}
                   value={upcoming}
                   tone="brandInk"
                   selected={filter === "upcoming"}
-                  hint="Show only upcoming doses"
                   onPress={() => toggle("upcoming")}
                 />
                 <StatCard
                   icon="warning-amber"
-                  label="Missed"
+                  label={t("status.missed")}
                   value={missed}
                   tone="badInk"
                   selected={filter === "missed"}
-                  hint="Show only missed doses"
                   onPress={() => toggle("missed")}
                 />
               </View>
@@ -223,43 +229,53 @@ export default function DashboardScreen() {
           {slots.length > 0 && (
             <View style={{ paddingHorizontal: 16, paddingTop: 20 }}>
               <SectionTitle
-                action={<LinkAction onPress={() => router.push("/history")}>History</LinkAction>}
+                action={
+                  <LinkAction onPress={() => router.push("/history")}>
+                    {t("nav.history")}
+                  </LinkAction>
+                }
               >
-                Today&apos;s schedule
+                {t("home.schedule")}
               </SectionTitle>
 
               {filter !== "all" && (
                 <Pressable
                   accessibilityRole="button"
+                  accessibilityLabel={t("common.clearFilter")}
                   onPress={() => setFilter("all")}
                   style={[styles.clearFilter, { backgroundColor: c.brandSoft }]}
                 >
                   <Text style={{ color: c.brandInk, fontWeight: "700", fontSize: 15 }}>
-                    Showing {FILTER_LABEL[filter]} only
+                    {t("home.showingOnly", { filter: filterWord })}
                   </Text>
                   <MaterialIcons name="close" size={18} color={c.brandInk} />
                 </Pressable>
               )}
 
-              <Card padded={false} style={{ paddingHorizontal: 16 }}>
-                {filtered.length === 0 ? (
+              {filtered.length === 0 ? (
+                <Card padded={false} style={{ paddingHorizontal: 16 }}>
                   <T tone="ink2" center style={{ paddingVertical: 24 }}>
-                    No {FILTER_LABEL[filter as Exclude<Filter, "all">]} doses today.
+                    {t("home.noneToday", { filter: filterWord })}
                   </T>
-                ) : (
+                </Card>
+              ) : (
+                <Card padded={false} style={{ paddingHorizontal: 16 }}>
                   <DoseTimeline
                     slots={filtered}
                     onOpen={(s) => openMedicine(s.medicine.id)}
                     onAnswer={answer}
                   />
-                )}
-              </Card>
+                </Card>
+              )}
             </View>
           )}
 
-          <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
+          <View style={{ paddingHorizontal: 16, paddingTop: 16, gap: 12 }}>
             <Button variant="secondary" icon="add" onPress={() => router.push("/medicine/new")}>
-              Add medicine
+              {t("nav.addMedicine")}
+            </Button>
+            <Button variant="secondary" icon="summarize" onPress={() => router.push("/report")}>
+              {t("report.open")}
             </Button>
           </View>
         </>

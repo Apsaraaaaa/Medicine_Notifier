@@ -2,6 +2,9 @@ import type { HistoryEntry, Medicine } from "../types";
 import { MISSED_AFTER_MINUTES, type DoseState } from "../constants/theme";
 import { timeToMinutes, todayISO } from "./date";
 
+/** Shared empty set, so the default argument allocates nothing per call. */
+const EMPTY: ReadonlySet<string> = new Set();
+
 export interface DoseSlot {
   medicine: Medicine;
   time: string;
@@ -12,11 +15,28 @@ export function isActiveOn(med: Medicine, date = todayISO()): boolean {
   return date >= med.startDate && date <= med.endDate;
 }
 
-/** All dose slots for a day with their computed status. */
+/**
+ * The identity of one dose slot: medicine, day and time.
+ *
+ * Exported because the snooze map in AppContext is keyed by it, and a slot can
+ * only be shown as snoozed if both sides spell the key the same way.
+ */
+export function slotKey(medicineId: string, date: string, time: string): string {
+  return `${medicineId}|${date}|${time}`;
+}
+
+/**
+ * All dose slots for a day with their computed status.
+ *
+ * `snoozed` is the set of slot keys the user has pushed back and that have not
+ * come round again yet. It is optional and defaults to empty, so every existing
+ * caller — the adherence maths included — keeps the behaviour it had.
+ */
 export function getTodaySlots(
   medicines: Medicine[],
   history: HistoryEntry[],
-  date = todayISO()
+  date = todayISO(),
+  snoozed: ReadonlySet<string> = EMPTY
 ): DoseSlot[] {
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -31,6 +51,11 @@ export function getTodaySlots(
       let status: DoseState;
       if (hist) {
         status = hist.status;
+      } else if (snoozed.has(slotKey(med.id, date, time))) {
+        // Pushed back on purpose. Checked before the overdue test below, or a
+        // dose snoozed past its grace period would read as missed while the
+        // app is in fact still waiting to ask again.
+        status = "snoozed";
       } else if (timeToMinutes(time) <= nowMin) {
         // late by more than the grace period without a record = missed, else due
         status = nowMin - timeToMinutes(time) > MISSED_AFTER_MINUTES ? "missed" : "due";

@@ -1,10 +1,10 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { useTheme } from "../context/AppContext";
+import { useT, useTheme } from "../context/AppContext";
 import type { Palette } from "../constants/theme";
 import type { DayStats } from "../utils/insights";
-import { fromISO, prettyDate, todayISO } from "../utils/date";
+import { prettyDate, todayISO, weekdayShort } from "../utils/date";
 import { T, type IconName } from "./ui";
 
 /**
@@ -18,15 +18,12 @@ import { T, type IconName } from "./ui";
 
 type DayState = "none" | "complete" | "partial" | "missed" | "today";
 
-const STATE_META: Record<
-  DayState,
-  { fill: keyof Palette; on: keyof Palette; icon: IconName; word: string }
-> = {
-  complete: { fill: "brand", on: "onBrand", icon: "check", word: "all doses taken" },
-  partial: { fill: "warnSolid", on: "onWarn", icon: "remove", word: "some doses not taken" },
-  missed: { fill: "badSolid", on: "onBad", icon: "priority-high", word: "doses missed" },
-  today: { fill: "brandSoft", on: "brandInk", icon: "schedule", word: "still in progress" },
-  none: { fill: "brandSoft", on: "ink3", icon: "remove", word: "nothing scheduled" },
+const STATE_META: Record<DayState, { fill: keyof Palette; on: keyof Palette; icon: IconName }> = {
+  complete: { fill: "brand", on: "onBrand", icon: "check" },
+  partial: { fill: "warnSolid", on: "onWarn", icon: "remove" },
+  missed: { fill: "badSolid", on: "onBad", icon: "priority-high" },
+  today: { fill: "brandSoft", on: "brandInk", icon: "schedule" },
+  none: { fill: "brandSoft", on: "ink3", icon: "remove" },
 };
 
 function dayState(d: DayStats, isToday: boolean): DayState {
@@ -36,9 +33,6 @@ function dayState(d: DayStats, isToday: boolean): DayState {
   if (isToday) return "today";
   return "partial";
 }
-
-const weekdayShort = (iso: string) =>
-  fromISO(iso).toLocaleDateString(undefined, { weekday: "short" });
 
 export function WeekStrip({
   days,
@@ -51,6 +45,7 @@ export function WeekStrip({
   onSelect: (date: string | null) => void;
 }) {
   const c = useTheme();
+  const t = useT();
   const today = todayISO();
 
   // Only days that actually had doses can be kept to, so they are the
@@ -62,22 +57,26 @@ export function WeekStrip({
 
   return (
     <View>
-      <View style={styles.row} accessibilityLabel="Last seven days">
+      <View style={styles.row} accessibilityLabel={t("history.thisWeek")}>
         {days.map((d) => {
           const isToday = d.date === today;
           const meta = STATE_META[dayState(d, isToday)];
           const isSelected = selected === d.date;
           const summary =
             d.expected === 0
-              ? `${prettyDate(d.date)}: nothing scheduled`
-              : `${prettyDate(d.date)}: ${d.taken} of ${d.expected} taken, ${d.skipped} skipped, ${d.missed} missed`;
+              ? t("history.barNothing", { label: prettyDate(d.date) })
+              : t("history.barDetail", {
+                  label: prettyDate(d.date),
+                  taken: d.taken,
+                  expected: d.expected,
+                }) + (d.missed > 0 ? t("history.barMissed", { missed: d.missed }) : "");
 
           return (
             <Pressable
               key={d.date}
               accessibilityRole="button"
               accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={`${summary}. ${isSelected ? "Clear filter" : "Show this day"}`}
+              accessibilityLabel={`${summary}. ${isSelected ? t("common.clearFilter") : ""}`}
               onPress={() => onSelect(isSelected ? null : d.date)}
               style={styles.day}
             >
@@ -109,10 +108,12 @@ export function WeekStrip({
 
       <View style={styles.progressHead}>
         <T size={15} weight="700" tone="ink2">
-          Weekly progress
+          {t("history.weeklyProgress")}
         </T>
         <T size={15} weight="700" tone={perfect ? "okInk" : "ink2"}>
-          {scheduled.length === 0 ? "no doses this week" : `${kept}/${scheduled.length} days`}
+          {scheduled.length === 0
+            ? t("history.noDosesThisWeek")
+            : t("history.daysKept", { kept, total: scheduled.length })}
         </T>
       </View>
 

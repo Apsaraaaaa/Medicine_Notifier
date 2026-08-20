@@ -5,6 +5,7 @@
 // (a scheduled dose in the past with no record) because the app only ever
 // records an answer the user actually gave.
 
+import type { TranslationKey } from "../i18n";
 import type { HistoryEntry, Medicine } from "../types";
 import { expectedDoses, getTodaySlots } from "./schedule";
 import { fromISO, monthLabel, shiftDays, shortDate, todayISO, weekdayNarrow } from "./date";
@@ -169,13 +170,18 @@ export function bucketize(days: DayStats[]): Bucket[] {
   });
 }
 
-/** Wording for an adherence figure — never colour alone. */
-export function adherenceVerdict(adherence: number | null): string {
-  if (adherence === null) return "Nothing scheduled";
-  if (adherence >= 90) return "Excellent";
-  if (adherence >= 80) return "On track";
-  if (adherence >= 50) return "Needs attention";
-  return "Falling behind";
+/**
+ * Wording for an adherence figure — never colour alone.
+ *
+ * Returns a translation key rather than the words, so the same thresholds
+ * produce the same verdict in both languages.
+ */
+export function adherenceVerdict(adherence: number | null): TranslationKey {
+  if (adherence === null) return "verdict.nothing";
+  if (adherence >= 90) return "verdict.excellent";
+  if (adherence >= 80) return "verdict.onTrack";
+  if (adherence >= 50) return "verdict.needsAttention";
+  return "verdict.fallingBehind";
 }
 
 /** History filtered to the range, newest first, grouped by date. */

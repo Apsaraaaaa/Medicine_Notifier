@@ -14,6 +14,8 @@ export default function RootLayout() {
     // Both are no-ops in Expo Go, which has no notifications module.
     installForegroundHandler();
     // The Android channel must exist before the first reminder is posted.
+    // It is (re)named in the chosen language from inside the provider, which
+    // is the only place the language is known.
     ensureChannel();
   }, []);
 
@@ -33,10 +35,17 @@ export default function RootLayout() {
  * on the login screen bounces straight back to the tabs.
  */
 function Shell() {
-  const { ready, token, settings } = useApp();
+  const { ready, token, settings, language } = useApp();
   const c = useTheme();
   const router = useRouter();
   const segments = useSegments();
+
+  // Android names a notification channel once, at creation, but re-declaring
+  // it with the same id updates the name — so switching language relabels the
+  // channel in the system settings too.
+  useEffect(() => {
+    ensureChannel(language);
+  }, [language]);
 
   useEffect(() => {
     if (!ready) return;
@@ -61,6 +70,10 @@ function Shell() {
         <Stack.Screen name="settings" />
         <Stack.Screen name="medicine/new" />
         <Stack.Screen name="medicine/[id]" />
+        <Stack.Screen name="report" />
+        <Stack.Screen name="scan" />
+        <Stack.Screen name="caregivers" />
+        <Stack.Screen name="monitor/[id]" />
       </Stack>
 
       {/* Sits above every route: a dose can come due on any screen. */}

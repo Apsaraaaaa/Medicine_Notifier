@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { LanguageSwitch } from "../components/LanguageSwitch";
 import { Button, Field, IconButton, Segmented, T } from "../components/ui";
 import { RADIUS } from "../constants/theme";
 import { useApp, useTheme } from "../context/AppContext";
@@ -19,7 +20,7 @@ import { useApp, useTheme } from "../context/AppContext";
 const MIN_PASSWORD = 8;
 
 export default function LoginScreen() {
-  const { login, register, authLoading } = useApp();
+  const { login, register, authLoading, t } = useApp();
   const c = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -35,11 +36,11 @@ export default function LoginScreen() {
     setError("");
     try {
       if (mode === "register") {
-        if (!name.trim()) return setError("Please enter your name.");
+        if (!name.trim()) return setError(t("auth.needName"));
         if (password.length < MIN_PASSWORD) {
-          return setError(`Password must be at least ${MIN_PASSWORD} characters.`);
+          return setError(t("auth.passwordTooShort", { count: MIN_PASSWORD }));
         }
-        if (password !== confirm) return setError("Those passwords don't match.");
+        if (password !== confirm) return setError(t("auth.passwordMismatch"));
         await register(name.trim(), email.trim(), password);
       } else {
         await login(email.trim(), password);
@@ -69,29 +70,35 @@ export default function LoginScreen() {
             <MaterialIcons name="medical-services" size={34} color="#FFFFFF" />
           </View>
           <Text style={styles.heroTitle}>Medicine Notifier</Text>
-          <Text style={styles.heroTagline}>Never miss a dose again</Text>
+          <Text style={styles.heroTagline}>{t("auth.tagline")}</Text>
         </LinearGradient>
 
         {/* form card overlapping the hero */}
         <View style={styles.formWrap}>
           <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.line }]}>
+            {/* Before anything else on the very first screen: somebody who
+                cannot read English must be able to switch without signing in. */}
+            <View style={{ marginBottom: 18 }}>
+              <LanguageSwitch />
+            </View>
+
             <Segmented
-              label="Account mode"
+              label={t("auth.mode")}
               value={mode}
               onChange={(m) => {
                 setError("");
                 setMode(m);
               }}
               options={[
-                { key: "login", label: "Log in" },
-                { key: "register", label: "Sign up" },
+                { key: "login", label: t("auth.login") },
+                { key: "register", label: t("auth.signup") },
               ]}
             />
 
             <View style={{ gap: 16, marginTop: 20 }}>
               {mode === "register" && (
                 <Field
-                  label="Full name"
+                  label={t("auth.fullName")}
                   icon="person"
                   autoComplete="name"
                   value={name}
@@ -100,7 +107,7 @@ export default function LoginScreen() {
               )}
 
               <Field
-                label="Email"
+                label={t("auth.email")}
                 icon="email"
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -110,18 +117,18 @@ export default function LoginScreen() {
               />
 
               <Field
-                label="Password"
+                label={t("auth.password")}
                 icon="lock"
                 secureTextEntry={!reveal}
                 autoCapitalize="none"
                 autoComplete={mode === "login" ? "current-password" : "new-password"}
-                hint={mode === "register" ? `At least ${MIN_PASSWORD} characters` : undefined}
+                hint={mode === "register" ? t("auth.minChars", { count: MIN_PASSWORD }) : undefined}
                 value={password}
                 onChangeText={setPassword}
                 right={
                   <IconButton
                     icon={reveal ? "visibility-off" : "visibility"}
-                    label={reveal ? "Hide password" : "Show password"}
+                    label={t(reveal ? "auth.hidePassword" : "auth.showPassword")}
                     onPress={() => setReveal((v) => !v)}
                   />
                 }
@@ -129,7 +136,7 @@ export default function LoginScreen() {
 
               {mode === "register" && (
                 <Field
-                  label="Confirm password"
+                  label={t("auth.confirmPassword")}
                   icon="lock"
                   secureTextEntry={!reveal}
                   autoCapitalize="none"
@@ -148,7 +155,7 @@ export default function LoginScreen() {
               ) : null}
 
               <Button size="lg" loading={authLoading} onPress={submit}>
-                {mode === "login" ? "Log in" : "Create account"}
+                {t(mode === "login" ? "auth.login" : "auth.createAccount")}
               </Button>
             </View>
           </View>

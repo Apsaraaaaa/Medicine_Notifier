@@ -3,7 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { RADIUS } from "../constants/theme";
-import { useTheme } from "../context/AppContext";
+import { useT, useTheme } from "../context/AppContext";
 import { formatTime12 } from "../utils/date";
 import { relativeTime, type DoseSlot } from "../utils/schedule";
 
@@ -22,8 +22,10 @@ export function NextDoseCard({
   onAnswer: () => void;
 }) {
   const c = useTheme();
+  const t = useT();
   const overdue = slot.status === "due" || slot.status === "missed";
   const { medicine } = slot;
+  const kicker = t(overdue ? "home.doseDue" : "home.nextDose");
 
   return (
     <LinearGradient
@@ -34,7 +36,7 @@ export function NextDoseCard({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${overdue ? "Dose due" : "Next dose"}: ${medicine.name} at ${formatTime12(slot.time)}. Open medicine`}
+        accessibilityLabel={`${kicker}: ${medicine.name} · ${formatTime12(slot.time)}`}
         onPress={onOpen}
         style={({ pressed }) => [styles.body, { opacity: pressed ? 0.9 : 1 }]}
       >
@@ -44,7 +46,9 @@ export function NextDoseCard({
 
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={styles.topRow}>
-            <Text style={styles.kicker}>{overdue ? "DOSE DUE" : "NEXT DOSE"}</Text>
+            <Text style={styles.kicker} numberOfLines={1}>
+              {kicker.toUpperCase()}
+            </Text>
             <View style={styles.relative}>
               <Text style={styles.relativeText}>{relativeTime(slot.time)}</Text>
             </View>
@@ -76,7 +80,7 @@ export function NextDoseCard({
             color="#4C319E"
           />
           <Text style={styles.actionText}>
-            {overdue ? "Answer this dose" : "Take it now"}
+            {t(overdue ? "home.answerDose" : "home.takeItNow")}
           </Text>
         </Pressable>
       </View>

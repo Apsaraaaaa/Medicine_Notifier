@@ -21,8 +21,10 @@
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import { Platform } from "react-native";
 
-import type { Medicine } from "../types";
+import { translate, type Language } from "../i18n";
+import type { CaregiverAlert, Medicine } from "../types";
 import { formatTime12, todayISO } from "../utils/date";
+import { mealOf } from "../utils/meal";
 import { isActiveOn } from "../utils/schedule";
 
 type NotificationsModule = typeof import("expo-notifications");
@@ -78,11 +80,28 @@ export function installForegroundHandler() {
   });
 }
 
-export async function ensureChannel() {
+/**
+ * The line under a reminder: the medicine, its dose, when it is due, and — when
+ * the medicine names one — how it sits around food. "after breakfast" is what
+ * makes a reminder actionable without opening the app.
+ */
+function reminderBody(medicine: Medicine, time: string, language: Language): string {
+  const key = medicine.dosage ? "notify.bodyWithDose" : "notify.body";
+  const base = translate(language, key, {
+    name: medicine.name,
+    dosage: medicine.dosage,
+    time: formatTime12(time),
+  });
+
+  const meal = mealOf(medicine);
+  return meal === "none" ? base : `${base} · ${translate(language, `meal.${meal}`)}`;
+}
+
+export async function ensureChannel(language: Language = "en") {
   const N = notifications();
   if (!N || Platform.OS !== "android") return;
   await N.setNotificationChannelAsync(REMINDER_CHANNEL, {
-    name: "Medicine reminders",
+    name: translate(language, "notify.channel"),
     importance: N.AndroidImportance.MAX,
     vibrationPattern: [0, 400, 200, 400],
     lockscreenVisibility: N.AndroidNotificationVisibility.PUBLIC,
@@ -119,7 +138,8 @@ export async function requestPermission(): Promise<boolean> {
  */
 export async function syncScheduledReminders(
   medicines: Medicine[],
-  enabled: boolean
+  enabled: boolean,
+  language: Language = "en"
 ): Promise<number> {
   const N = notifications();
   if (!N) return 0;
@@ -144,8 +164,8 @@ export async function syncScheduledReminders(
 
       await N.scheduleNotificationAsync({
         content: {
-          title: "Time to take your medicine",
-          body: `${med.name}${med.dosage ? ` — ${med.dosage}` : ""} at ${formatTime12(time)}`,
+          title: translate(language, "notify.title"),
+          body: reminderBody(med, time, language),
           data: { medicineId: med.id, time } satisfies ReminderPayload,
           sound: "default",
           ...(Platform.OS === "android" ? { channelId: REMINDER_CHANNEL } : {}),
@@ -183,15 +203,20 @@ export async function cancelAllReminders() {
 }
 
 /** A dose the user snoozed: one-shot, minutes from now. */
-export async function scheduleSnooze(medicine: Medicine, time: string, minutes: number) {
+export async function scheduleSnooze(
+  medicine: Medicine,
+  time: string,
+  minutes: number,
+  language: Language = "en"
+) {
   const N = notifications();
   if (!N) return;
   const allowed = await requestPermission();
   if (!allowed) return;
   await N.scheduleNotificationAsync({
     content: {
-      title: "Snoozed dose",
-      body: `${medicine.name}${medicine.dosage ? ` — ${medicine.dosage}` : ""}`,
+      title: translate(language, "notify.snoozedTitle"),
+      body: reminderBody(medicine, time, language),
       data: { medicineId: medicine.id, time } satisfies ReminderPayload,
       sound: "default",
       ...(Platform.OS === "android" ? { channelId: REMINDER_CHANNEL } : {}),
@@ -231,6 +256,33 @@ export function addReminderResponseListener(
     if (payload) open(payload);
   });
   return () => sub.remove();
+}
+
+/**
+ * Announces a caregiver alert on this phone, right now.
+ *
+ * There is no push service in this stack, so an alert reaches a caregiver when
+ * their app next syncs — and this is what makes it land as a notification they
+ * can see on the lock screen rather than a badge they have to go looking for.
+ * The caller is responsible for only ever passing an alert once (AppContext
+ * keeps the ids it has already announced).
+ */
+export async function presentCaregiverAlert(alert: CaregiverAlert, language: Language = "en") {
+  const N = notifications();
+  if (!N) return;
+  const allowed = await requestPermission();
+  if (!allowed) return;
+  await N.scheduleNotificationAsync({
+    content: {
+      title: translate(language, "notify.alertTitle", { name: alert.patientName }),
+      body: alert.message,
+      data: { alertId: alert.id, linkId: alert.linkId },
+      sound: "default",
+      ...(Platform.OS === "android" ? { channelId: REMINDER_CHANNEL } : {}),
+    },
+    // Immediate: the check that produced it already established it is overdue.
+    trigger: null,
+  });
 }
 
 /** True when the medicine still has a dose to give on the given date. */

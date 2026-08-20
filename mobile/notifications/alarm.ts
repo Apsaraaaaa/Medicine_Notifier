@@ -15,9 +15,38 @@ const ALARM = require("../assets/sounds/alarm.wav");
 
 let player: AudioPlayer | null = null;
 let statusSub: EventSubscription | null = null;
+// The volume the alarm was started at, so ducking can restore it exactly
+// rather than guessing at the user's setting.
+let baseVolume = 0.6;
+let ducked = false;
 
 function clamp(volume: number) {
   return Math.max(0.05, Math.min(1, volume));
+}
+
+/**
+ * How far the tone drops while the spoken reminder is talking over it.
+ *
+ * Not silence: the alarm is what carries across a room, and cutting it
+ * entirely for every sentence would make the reminder come and go. A quarter
+ * is enough for the words to sit on top of it.
+ */
+const DUCK = 0.25;
+
+/**
+ * Lowers the alarm while the voice speaks, and restores it afterwards.
+ *
+ * A no-op when no alarm is playing, so the voice reminder works the same
+ * whether or not the alarm sound is switched on.
+ */
+export function duckAlarm(quiet: boolean) {
+  ducked = quiet;
+  if (!player) return;
+  try {
+    player.volume = clamp(quiet ? baseVolume * DUCK : baseVolume);
+  } catch {
+    /* player already released */
+  }
 }
 
 export async function startAlarm(volume = 0.6) {
@@ -34,7 +63,9 @@ export async function startAlarm(volume = 0.6) {
     const created = createAudioPlayer(ALARM);
     player = created;
     created.loop = true;
-    created.volume = clamp(volume);
+    baseVolume = volume;
+    // Starting while the voice is mid-sentence must not undo the ducking.
+    created.volume = clamp(ducked ? volume * DUCK : volume);
 
     // play() before the asset has loaded is a no-op, and createAudioPlayer
     // loads asynchronously — so ask once now, and again the moment the player
@@ -54,6 +85,7 @@ export async function startAlarm(volume = 0.6) {
 export async function stopAlarm() {
   const current = player;
   player = null;
+  ducked = false;
   statusSub?.remove();
   statusSub = null;
   if (!current) return;

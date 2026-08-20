@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from catalog.models import CatalogMedicine
 
-from .models import Medicine
+from .models import MealRelation, Medicine
 
 TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
@@ -51,6 +51,12 @@ class MedicineSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    # Routine grouping. Both default on the model, so an older client that
+    # doesn't send them keeps working unchanged.
+    mealRelation = serializers.ChoiceField(
+        source="meal_relation", choices=MealRelation.choices, required=False
+    )
+    critical = serializers.BooleanField(source="is_critical", required=False)
     createdAt = serializers.DateTimeField(source="created_at", read_only=True)
     updatedAt = serializers.DateTimeField(source="updated_at", read_only=True)
 
@@ -66,6 +72,9 @@ class MedicineSerializer(serializers.ModelSerializer):
             "startDate",
             "endDate",
             "color",
+            "routine",
+            "mealRelation",
+            "critical",
             "active",
             "catalogId",
             "createdAt",

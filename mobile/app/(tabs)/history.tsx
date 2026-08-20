@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { HistoryChart } from "../../components/HistoryChart";
+import { PatientHistory } from "../../components/patient/PatientHistory";
 import { WeekStrip } from "../../components/WeekStrip";
 import {
   AdherenceRing,
@@ -21,7 +22,7 @@ import {
 import { STATUS_META } from "../../constants/theme";
 import { useApp, useTheme } from "../../context/AppContext";
 import type { HistoryEntry, HistoryStatus } from "../../types";
-import { formatTime12, prettyDate, todayISO } from "../../utils/date";
+import { dateTime, formatTime12, prettyDate, todayISO } from "../../utils/date";
 import {
   adherenceVerdict,
   bucketize,
@@ -40,7 +41,7 @@ const STATUS_ICON: Record<HistoryStatus, IconName> = {
 };
 
 export default function HistoryScreen() {
-  const { history, medicines, refresh, refreshing } = useApp();
+  const { history, medicines, refresh, refreshing, patientMode, t } = useApp();
   const c = useTheme();
   const router = useRouter();
 
@@ -65,9 +66,13 @@ export default function HistoryScreen() {
         ? "trending-up"
         : "trending-down";
 
+  // Patient Mode replaces the insights screen with "what did I take, what did
+  // I miss" — same maths, none of the interpretation.
+  if (patientMode) return <PatientHistory />;
+
   return (
     <View style={{ flex: 1, backgroundColor: c.canvas }}>
-      <AppHeader title="History & insights" subtitle="How closely you're keeping to plan" />
+      <AppHeader title={t("history.title")} subtitle={t("history.subtitle")} />
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
@@ -77,27 +82,27 @@ export default function HistoryScreen() {
       >
         {medicines.length > 0 && range === "week" && (
           <Card style={{ marginBottom: 16 }}>
-            <SectionTitle>This week</SectionTitle>
+            <SectionTitle>{t("history.thisWeek")}</SectionTitle>
             <WeekStrip days={weekDays} selected={day} onSelect={setDay} />
           </Card>
         )}
 
         <Segmented
-          label="Time range"
+          label={t("history.range")}
           value={range}
           onChange={setRange}
           options={[
-            { key: "week", label: "Week" },
-            { key: "month", label: "Month" },
-            { key: "all", label: "All" },
+            { key: "week", label: t("history.week") },
+            { key: "month", label: t("history.month") },
+            { key: "all", label: t("common.all") },
           ]}
         />
 
         {summary.expected === 0 ? (
           <EmptyState
             icon="history"
-            title="No dose history yet"
-            subtitle="Your taken, skipped and missed doses will appear here once reminders start."
+            title={t("history.empty")}
+            subtitle={t("history.emptyHint")}
           />
         ) : (
           <>
@@ -109,7 +114,10 @@ export default function HistoryScreen() {
                   size={84}
                   stroke={10}
                   value={summary.adherence === null ? null : summary.adherence / 100}
-                  label={`${summary.adherence ?? 0}% of scheduled doses taken`}
+                  label={t("report.dosesTaken", {
+                    taken: summary.taken,
+                    expected: summary.expected,
+                  })}
                 >
                   <Text style={{ fontSize: 22, fontWeight: "800", color: c.ink }}>
                     {summary.adherence === null ? "—" : `${summary.adherence}%`}
@@ -118,17 +126,22 @@ export default function HistoryScreen() {
 
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <T size={22} weight="800" numberOfLines={1}>
-                    {adherenceVerdict(summary.adherence)}
+                    {t(adherenceVerdict(summary.adherence))}
                   </T>
                   <T size={15} tone="ink2">
-                    {summary.taken} of {summary.expected} doses taken
+                    {t("report.dosesTaken", {
+                      taken: summary.taken,
+                      expected: summary.expected,
+                    })}
                   </T>
                   {movement && (
                     <View style={styles.trendRow}>
                       <MaterialIcons name={trendIcon} size={18} color={c.brandInk} />
                       <T size={15} weight="700" tone="brandInk">
-                        {movement.delta > 0 ? "+" : ""}
-                        {movement.delta}% vs last {movement.days}d
+                        {t("history.trendVs", {
+                          delta: `${movement.delta > 0 ? "+" : ""}${movement.delta}`,
+                          days: movement.days,
+                        })}
                       </T>
                     </View>
                   )}
@@ -147,7 +160,7 @@ export default function HistoryScreen() {
 
             {/* daily history */}
             <View style={{ marginTop: 20 }}>
-              <SectionTitle>Dose history</SectionTitle>
+              <SectionTitle>{t("history.doseHistory")}</SectionTitle>
 
               {day && (
                 <Pressable
@@ -156,7 +169,9 @@ export default function HistoryScreen() {
                   style={[styles.clearFilter, { backgroundColor: c.brandSoft }]}
                 >
                   <Text style={{ color: c.brandInk, fontWeight: "700", fontSize: 15 }}>
-                    Showing {day === todayISO() ? "today" : prettyDate(day)} only
+                    {t("history.showingDay", {
+                      date: day === todayISO() ? t("common.today") : prettyDate(day),
+                    })}
                   </Text>
                   <MaterialIcons name="close" size={18} color={c.brandInk} />
                 </Pressable>
@@ -166,8 +181,8 @@ export default function HistoryScreen() {
                 <Card>
                   <T tone="ink2" center style={{ paddingVertical: 16 }}>
                     {day
-                      ? `No doses answered on ${prettyDate(day)}.`
-                      : "No answered doses in this range yet."}
+                      ? t("history.noneOnDay", { date: prettyDate(day) })
+                      : t("history.noneInRange")}
                   </T>
                 </Card>
               ) : (
@@ -175,7 +190,7 @@ export default function HistoryScreen() {
                   {groups.map(([date, entries]) => (
                     <View key={date}>
                       <T size={15} weight="700" tone="ink3" style={{ marginBottom: 6 }}>
-                        {date === todayISO() ? "Today" : prettyDate(date)}
+                        {date === todayISO() ? t("common.today") : prettyDate(date)}
                       </T>
                       <Card padded={false}>
                         {entries.map((h, i) => {
@@ -184,7 +199,7 @@ export default function HistoryScreen() {
                             <Pressable
                               key={h.id}
                               accessibilityRole="button"
-                              accessibilityLabel={`${h.medicineName} at ${formatTime12(h.time)} — ${meta.label}. Show details`}
+                              accessibilityLabel={`${h.medicineName} · ${formatTime12(h.time)} · ${t(meta.label)}`}
                               onPress={() => setDetail(h)}
                               style={({ pressed }) => [
                                 styles.entry,
@@ -213,7 +228,7 @@ export default function HistoryScreen() {
 
                               <StatusBadge
                                 icon={STATUS_ICON[h.status]}
-                                label={meta.label}
+                                label={t(meta.label)}
                                 bg={c[meta.soft]}
                                 fg={c[meta.ink]}
                               />
@@ -237,7 +252,7 @@ export default function HistoryScreen() {
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
               <StatusBadge
                 icon={STATUS_ICON[detail.status]}
-                label={STATUS_META[detail.status].label}
+                label={t(STATUS_META[detail.status].label)}
                 bg={c[STATUS_META[detail.status].soft]}
                 fg={c[STATUS_META[detail.status].ink]}
               />
@@ -247,11 +262,11 @@ export default function HistoryScreen() {
             </View>
 
             <T tone="ink2">
-              <T weight="700">Dose: </T>
+              <T weight="700">{t("history.dose")}</T>
               {detail.dosage}
             </T>
             <T size={15} tone="ink3">
-              Answered {new Date(detail.recordedAt).toLocaleString()}
+              {t("history.answeredAt", { when: dateTime(detail.recordedAt) })}
             </T>
 
             {detail.note ? (
@@ -270,7 +285,7 @@ export default function HistoryScreen() {
                   router.push(`/medicine/${id}`);
                 }}
               >
-                View medicine
+                {t("history.viewMedicine")}
               </Button>
             )}
           </View>

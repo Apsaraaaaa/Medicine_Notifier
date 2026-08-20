@@ -11,7 +11,20 @@ import { Platform } from "react-native";
 
 import { STORAGE_KEYS } from "../constants/theme";
 import { storage } from "../utils/storage";
-import type { CatalogMedicine, HistoryEntry, Medicine, User } from "../types";
+import type {
+  CaregiverAlert,
+  CaregiverLink,
+  CatalogMedicine,
+  HistoryEntry,
+  Language,
+  Medicine,
+  PatientLink,
+  PatientReport,
+  Report,
+  ReportRange,
+  ScanResult,
+  User,
+} from "../types";
 
 /** Carries the HTTP status so callers can tell "rejected" from "offline". */
 export class ApiError extends Error {
@@ -111,12 +124,17 @@ async function request<T>(
 ): Promise<T> {
   const token = await storage.get<string | null>(STORAGE_KEYS.token, null);
 
+  // A multipart body must set its own Content-Type: the boundary is generated
+  // by fetch, and naming the type ourselves would leave the server unable to
+  // find where each part begins.
+  const isForm = typeof FormData !== "undefined" && options.body instanceof FormData;
+
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}`, {
       ...options,
       headers: {
-        "Content-Type": "application/json",
+        ...(isForm ? {} : { "Content-Type": "application/json" }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(options.headers ?? {}),
       },
@@ -244,6 +262,23 @@ export async function updateProfile(name: string): Promise<User> {
   return user;
 }
 
+/**
+ * PATCH /api/auth/profile/ — the account's language.
+ *
+ * The app switches language locally and immediately; this tells the server,
+ * which needs it for the text it composes itself (a caregiver alert). Failing
+ * to reach the server must therefore never block the switch, so callers treat
+ * this as best-effort.
+ */
+export async function updateLanguage(language: Language): Promise<User> {
+  const user = await request<User>("/auth/profile/", {
+    method: "PATCH",
+    body: JSON.stringify({ language }),
+  });
+  await storage.set(STORAGE_KEYS.user, user);
+  return user;
+}
+
 // POST /api/auth/change-password/
 export async function changePassword(oldPw: string, newPw: string) {
   await request("/auth/change-password/", {
@@ -315,4 +350,118 @@ export async function addHistory(entry: Omit<HistoryEntry, "id">): Promise<Histo
       note: entry.note ?? "",
     }),
   });
+}
+
+// ---- REPORT ----
+
+// GET /api/reports/?range=week|month|all
+// Every figure is computed server-side so the report, the app and a caregiver's
+// view of the same person can never disagree.
+export async function getReport(range: ReportRange = "week"): Promise<Report> {
+  return request<Report>(`/reports/?range=${range}`);
+}
+
+// ---- SCANNER ----
+
+// GET /api/catalog/scan/ — can this server read a photograph, or only text?
+export async function scanCapabilities(): Promise<{ imageSupported: boolean }> {
+  return request<{ imageSupported: boolean }>("/catalog/scan/");
+}
+
+// POST /api/catalog/scan/  {"text": "..."}
+export async function scanText(text: string): Promise<ScanResult> {
+  return request<ScanResult>("/catalog/scan/", {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+}
+
+/**
+ * POST /api/catalog/scan/ with a photograph.
+ *
+ * The file is sent by reference — React Native's fetch reads the uri itself,
+ * so the image never has to be loaded into JS memory, which matters when it is
+ * a 4000px camera capture.
+ */
+export async function scanImage(uri: string, mimeType = "image/jpeg"): Promise<ScanResult> {
+  const form = new FormData();
+  const name = uri.split("/").pop() || "scan.jpg";
+  form.append("image", { uri, name, type: mimeType } as unknown as Blob, name);
+  return request<ScanResult>("/catalog/scan/", { method: "POST", body: form });
+}
+
+// ---- CAREGIVERS (the patient's side: who may watch me) ----
+
+// GET /api/caregivers/
+export async function getCaregivers(): Promise<CaregiverLink[]> {
+  return listOf<CaregiverLink>(await request<unknown>("/caregivers/"));
+}
+
+// POST /api/caregivers/
+export async function addCaregiver(data: {
+  caregiverEmail: string;
+  caregiverName?: string;
+  relationship?: string;
+  alertOnMissed?: boolean;
+}): Promise<CaregiverLink> {
+  return request<CaregiverLink>("/caregivers/", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+// PATCH /api/caregivers/{id}/
+export async function updateCaregiver(
+  id: string,
+  patch: Partial<Pick<CaregiverLink, "caregiverName" | "relationship" | "alertOnMissed">>
+): Promise<CaregiverLink> {
+  return request<CaregiverLink>(`/caregivers/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+// DELETE /api/caregivers/{id}/ — revokes access; the link is kept as revoked.
+export async function removeCaregiver(id: string): Promise<void> {
+  await request<void>(`/caregivers/${id}/`, { method: "DELETE" });
+}
+
+// ---- CAREGIVERS (the caregiver's side: who I watch) ----
+
+// GET /api/caregivers/patients/
+export async function getPatients(): Promise<PatientLink[]> {
+  return listOf<PatientLink>(await request<unknown>("/caregivers/patients/"));
+}
+
+// GET /api/caregivers/patients/{linkId}/?range=…
+export async function getPatientReport(
+  linkId: string,
+  range: ReportRange = "week"
+): Promise<PatientReport> {
+  return request<PatientReport>(`/caregivers/patients/${linkId}/?range=${range}`);
+}
+
+// POST /api/caregivers/accept/ — redeem an invite sent before signing up.
+export async function acceptInvite(code: string): Promise<PatientLink> {
+  return request<PatientLink>("/caregivers/accept/", {
+    method: "POST",
+    body: JSON.stringify({ code: code.trim().toUpperCase() }),
+  });
+}
+
+// GET /api/caregivers/alerts/
+export async function getAlerts(unreadOnly = false): Promise<CaregiverAlert[]> {
+  return listOf<CaregiverAlert>(
+    await request<unknown>(`/caregivers/alerts/${unreadOnly ? "?unread=true" : ""}`)
+  );
+}
+
+// POST /api/caregivers/alerts/{id}/read/
+export async function markAlertRead(id: string): Promise<CaregiverAlert> {
+  return request<CaregiverAlert>(`/caregivers/alerts/${id}/read/`, { method: "POST" });
+}
+
+// POST /api/caregivers/alerts/read-all/
+export async function markAllAlertsRead(): Promise<{ updated: number }> {
+  return request<{ updated: number }>("/caregivers/alerts/read-all/", { method: "POST" });
 }

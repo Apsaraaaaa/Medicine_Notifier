@@ -3,6 +3,8 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { LanguageSwitch } from "../../components/LanguageSwitch";
+import { LANGUAGES } from "../../i18n";
 import { isActive } from "../../components/MedicineCard";
 import {
   AppHeader,
@@ -13,20 +15,37 @@ import {
   SectionTitle,
   SettingsRow,
   Sheet,
+  StatusBadge,
   T,
   Toggle,
 } from "../../components/ui";
-import { APP_VERSION, RADIUS, SNOOZE_MINUTES } from "../../constants/theme";
-import { useApp, useTheme } from "../../context/AppContext";
+import { APP_VERSION, RADIUS } from "../../constants/theme";
+import { useApp, useTheme, useVoiceStatus } from "../../context/AppContext";
 import { adherenceVerdict, buildDailyStats, rangeDays, summarize } from "../../utils/insights";
 import { exportHistoryCsv } from "../../utils/export";
 
-type SheetKey = "caregiver" | "help" | "about" | null;
+
+type SheetKey = "help" | "about" | null;
 
 export default function ProfileScreen() {
-  const { user, logout, medicines, history, settings, updateSettings, updateProfile } = useApp();
+  const {
+    user,
+    logout,
+    medicines,
+    history,
+    settings,
+    updateSettings,
+    updateProfile,
+    patients,
+    unreadAlerts,
+    snoozeMinutes,
+    t,
+  } = useApp();
   const c = useTheme();
   const router = useRouter();
+  const voice = useVoiceStatus();
+  const languageName =
+    LANGUAGES.find((l) => l.key === settings.language)?.native ?? settings.language;
 
   const [confirmOut, setConfirmOut] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -41,7 +60,7 @@ export default function ProfileScreen() {
   const summary = summarize(buildDailyStats(medicines, history, days));
 
   const saveName = async () => {
-    if (!name.trim()) return setNameError("Name required.");
+    if (!name.trim()) return setNameError(t("profile.nameRequired"));
     setSaving(true);
     setNameError("");
     try {
@@ -57,15 +76,17 @@ export default function ProfileScreen() {
   const doExport = async () => {
     try {
       const count = await exportHistoryCsv(history);
-      setExported(count === 0 ? "Nothing to export yet." : `Exported ${count} dose records as CSV.`);
+      setExported(
+        count === 0 ? t("profile.exportEmpty") : t("profile.exported", { count })
+      );
     } catch {
-      setExported("Couldn't write the export file.");
+      setExported(t("profile.exportFailed"));
     }
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: c.canvas }}>
-      <AppHeader title="Profile" />
+      <AppHeader title={t("profile.title")} />
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
         {/* identity */}
@@ -93,17 +114,27 @@ export default function ProfileScreen() {
             >
               <MaterialIcons name="edit" size={17} color={c.brandInk} />
               <Text style={{ color: c.brandInk, fontWeight: "700", fontSize: 15 }}>
-                Edit profile
+                {t("profile.editProfile")}
               </Text>
             </Pressable>
           </View>
         </Card>
 
+        {/* Language sits above everything else on purpose: somebody who opened
+            the app in the wrong language needs to find this first, and it is
+            labelled in both scripts so it is findable either way. */}
+        <View style={{ marginTop: 20 }}>
+          <SectionTitle>{t("profile.language")}</SectionTitle>
+          <Card>
+            <LanguageSwitch />
+          </Card>
+        </View>
+
         {/* account stats — each opens the screen it summarises */}
         <View style={styles.stats}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${activeCount} active medicines. Open medicines`}
+            accessibilityLabel={`${activeCount} ${t("profile.activeMedicines")}`}
             onPress={() => router.push("/medicines")}
             style={[styles.statCard, { backgroundColor: c.surface, borderColor: c.line }]}
           >
@@ -113,7 +144,7 @@ export default function ProfileScreen() {
                 {activeCount}
               </T>
               <T size={15} tone="ink3" numberOfLines={1}>
-                Active medicines
+                {t("profile.activeMedicines")}
               </T>
             </View>
             <MaterialIcons name="chevron-right" size={20} color={c.ink3} />
@@ -121,7 +152,7 @@ export default function ProfileScreen() {
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${summary.adherence === null ? "No" : summary.adherence + "%"} consistency. Open history and insights`}
+            accessibilityLabel={t("home.consistency")}
             onPress={() => router.push("/history")}
             style={[styles.statCard, { backgroundColor: c.surface, borderColor: c.line }]}
           >
@@ -131,7 +162,9 @@ export default function ProfileScreen() {
                 {summary.adherence === null ? "—" : `${summary.adherence}%`}
               </T>
               <T size={15} tone="ink3" numberOfLines={1}>
-                {summary.adherence === null ? "No data yet" : adherenceVerdict(summary.adherence)}
+                {summary.adherence === null
+                  ? t("profile.noDataYet")
+                  : t(adherenceVerdict(summary.adherence))}
               </T>
             </View>
             <MaterialIcons name="chevron-right" size={20} color={c.ink3} />
@@ -140,43 +173,95 @@ export default function ProfileScreen() {
 
         {/* settings */}
         <View style={{ marginTop: 20 }}>
-          <SectionTitle>Settings</SectionTitle>
+          <SectionTitle>{t("profile.settings")}</SectionTitle>
           <Card style={{ paddingVertical: 4 }}>
             <SettingsRow
+              icon="accessibility-new"
+              label={t("settings.patientMode")}
+              description={t("settings.patientModeHint")}
+              control={
+                <Toggle
+                  label={t("settings.patientMode")}
+                  on={settings.patientMode}
+                  onChange={(v) => updateSettings({ patientMode: v })}
+                />
+              }
+            />
+            <SettingsRow
+              icon="record-voice-over"
+              label={t("settings.voiceReminder")}
+              description={t(voice.hint, { language: languageName })}
+              control={
+                <Toggle
+                  label={t("settings.voiceReminder")}
+                  on={settings.voiceReminder && voice.available}
+                  onChange={(v) => updateSettings({ voiceReminder: v })}
+                  disabled={!voice.available}
+                />
+              }
+            />
+            <SettingsRow
+              icon="summarize"
+              label={t("report.open")}
+              description={t("report.openHint")}
+              onPress={() => router.push("/report")}
+            />
+            <SettingsRow
+              icon="document-scanner"
+              label={t("scan.open")}
+              description={t("scan.openHint")}
+              onPress={() => router.push("/scan")}
+            />
+            <SettingsRow
+              icon="family-restroom"
+              label={t("care.open")}
+              description={t("care.openHint")}
+              control={
+                unreadAlerts > 0 ? (
+                  <StatusBadge
+                    label={t("care.unreadAlerts", { count: unreadAlerts })}
+                    bg={c.badSoft}
+                    fg={c.badInk}
+                  />
+                ) : patients.length > 0 ? (
+                  <StatusBadge label={String(patients.length)} bg={c.brandSoft} fg={c.brandInk} />
+                ) : undefined
+              }
+              onPress={() => router.push("/caregivers")}
+            />
+            <SettingsRow
               icon="notifications"
-              label="Notifications"
-              description="Reminders, alarm sound & volume"
-              value={settings.notifications ? "On" : "Off"}
+              label={t("profile.notifications")}
+              description={t("profile.notificationsHint")}
+              value={settings.notifications ? t("common.on") : t("common.off")}
               onPress={() => router.push("/settings")}
             />
             <SettingsRow
               icon="dark-mode"
-              label="Dark mode"
-              description="Easier on the eyes at night"
+              label={t("profile.darkMode")}
+              description={t("profile.darkModeHint")}
               control={
                 <Toggle
-                  label="Dark mode"
+                  label={t("profile.darkMode")}
                   on={settings.darkMode}
                   onChange={(v) => updateSettings({ darkMode: v })}
                 />
               }
             />
             <SettingsRow
-              icon="family-restroom"
-              label="Caregiver / Family access"
-              description="Not available yet"
-              onPress={() => setSheet("caregiver")}
-            />
-            <SettingsRow
               icon="ios-share"
-              label="Export history"
-              description="Share a CSV of every recorded dose"
+              label={t("profile.exportHistory")}
+              description={t("profile.exportHistoryHint")}
               onPress={doExport}
             />
-            <SettingsRow icon="help-outline" label="Help & support" onPress={() => setSheet("help")} />
+            <SettingsRow
+              icon="help-outline"
+              label={t("profile.help")}
+              onPress={() => setSheet("help")}
+            />
             <SettingsRow
               icon="info-outline"
-              label="About the app"
+              label={t("profile.about")}
               value={`v${APP_VERSION}`}
               onPress={() => setSheet("about")}
             />
@@ -190,26 +275,31 @@ export default function ProfileScreen() {
 
         <View style={{ marginTop: 20 }}>
           <Button variant="secondary" icon="logout" onPress={() => setConfirmOut(true)}>
-            Log out
+            {t("profile.logout")}
           </Button>
         </View>
       </ScrollView>
 
       {editing && (
         <Modal
-          title="Edit profile"
-          description="Your email is used to sign in and can't be changed here."
+          title={t("profile.editTitle")}
+          description={t("profile.editBody")}
           onClose={() => setEditing(false)}
         >
           <View style={{ gap: 16 }}>
-            <Field label="Full name" value={name} error={nameError} onChangeText={setName} />
-            <Field label="Email" value={user?.email ?? ""} editable={false} />
+            <Field
+              label={t("auth.fullName")}
+              value={name}
+              error={nameError}
+              onChangeText={setName}
+            />
+            <Field label={t("auth.email")} value={user?.email ?? ""} editable={false} />
             <View style={{ flexDirection: "row", gap: 12 }}>
               <Button variant="secondary" style={{ flex: 1 }} onPress={() => setEditing(false)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button style={{ flex: 1 }} loading={saving} onPress={saveName}>
-                Save
+                {t("common.save")}
               </Button>
             </View>
           </View>
@@ -218,63 +308,36 @@ export default function ProfileScreen() {
 
       {confirmOut && (
         <Modal
-          title="Log out?"
-          description="You'll need to log in again next time. Your medicines and history stay safe on the server."
+          title={t("profile.logoutTitle")}
+          description={t("profile.logoutBody")}
           onClose={() => setConfirmOut(false)}
         >
           <View style={{ flexDirection: "row", gap: 12 }}>
             <Button variant="secondary" style={{ flex: 1 }} onPress={() => setConfirmOut(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button variant="danger" style={{ flex: 1 }} onPress={logout}>
-              Log out
+              {t("profile.logout")}
             </Button>
           </View>
         </Modal>
       )}
 
-      {sheet === "caregiver" && (
-        <Sheet title="Caregiver / Family access" onClose={() => setSheet(null)}>
-          <T tone="ink2" style={{ paddingBottom: 16 }}>
-            Sharing a schedule with a family member needs a second account linked to yours, which
-            the API doesn&apos;t model yet. In the meantime,{" "}
-            <T weight="700">Export history</T> produces a CSV you can send to a caregiver or
-            doctor.
-          </T>
-        </Sheet>
-      )}
-
       {sheet === "help" && (
-        <Sheet title="Help & support" onClose={() => setSheet(null)}>
+        <Sheet title={t("profile.help")} onClose={() => setSheet(null)}>
           <View style={{ gap: 12, paddingBottom: 16 }}>
-            <T tone="ink2">
-              <T weight="700">Reminders</T> fire at each time you set. The app schedules them with
-              the phone, so they arrive even when it is closed.
-            </T>
-            <T tone="ink2">
-              <T weight="700">Snooze</T> asks again after {SNOOZE_MINUTES} minutes.{" "}
-              <T weight="700">Skip</T> records a deliberate skip.
-            </T>
-            <T tone="ink2">
-              A dose you don&apos;t answer within an hour is counted as{" "}
-              <T weight="700">missed</T>, so your history stays honest.
-            </T>
+            <T tone="ink2">{t("profile.helpReminders")}</T>
+            <T tone="ink2">{t("profile.helpSnooze", { minutes: snoozeMinutes })}</T>
+            <T tone="ink2">{t("profile.helpMissed")}</T>
           </View>
         </Sheet>
       )}
 
       {sheet === "about" && (
-        <Sheet title="About Medicine Notifier" onClose={() => setSheet(null)}>
+        <Sheet title={t("profile.about")} onClose={() => setSheet(null)}>
           <View style={{ gap: 12, paddingBottom: 16 }}>
-            <T tone="ink2">
-              Version {APP_VERSION}. Medicine Notifier keeps your daily doses, rings when each one
-              is due, and records what you answered so you can see how closely you&apos;re keeping
-              to plan.
-            </T>
-            <T tone="ink2">
-              Your medicines and history are stored in your account on the Django API, so they
-              follow you to any device you sign in on.
-            </T>
+            <T tone="ink2">{t("profile.aboutBody", { version: APP_VERSION })}</T>
+            <T tone="ink2">{t("profile.aboutStorage")}</T>
           </View>
         </Sheet>
       )}
@@ -285,7 +348,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   avatar: { width: 66, height: 66, borderRadius: 33, alignItems: "center", justifyContent: "center" },
   editLink: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 36 },
-  stats: { flexDirection: "row", gap: 8, marginTop: 12 },
+  stats: { flexDirection: "row", gap: 8, marginTop: 20 },
   statCard: {
     flex: 1,
     flexDirection: "row",

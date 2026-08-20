@@ -35,9 +35,25 @@ class UserManager(BaseUserManager):
         return self.create_user(email, password, name, **extra_fields)
 
 
+class Language(models.TextChoices):
+    """
+    The language the account reads in.
+
+    The app keeps its own copy on the phone so the UI can switch offline; this
+    is the server's copy, used for anything the server writes *for* the user —
+    a caregiver alert, for instance, which is composed here and read there.
+    """
+
+    ENGLISH = "en", "English"
+    NEPALI = "ne", "Nepali"
+
+
 class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=150, blank=True)
+    language = models.CharField(
+        max_length=5, choices=Language.choices, default=Language.ENGLISH
+    )
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)

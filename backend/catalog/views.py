@@ -8,10 +8,14 @@ the match lands rather than left in alphabetical order.
 """
 
 from django.db.models import Case, IntegerField, Q, Value, When
-from rest_framework import mixins, viewsets
+from rest_framework import mixins, status, viewsets
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .models import CatalogMedicine
+from .scan import extract, ocr_available, run_ocr
 from .serializers import CatalogMedicineSerializer
 
 MAX_RESULTS = 50
@@ -70,3 +74,66 @@ class CatalogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.
         limit = max(1, min(limit, MAX_RESULTS))
 
         return qs.order_by("rank", "name", "strength")[:limit]
+
+
+# A phone camera photo, at the quality OCR needs. Bigger than this is a file
+# picked by mistake, and reading it would tie up a worker for no benefit.
+MAX_IMAGE_BYTES = 12 * 1024 * 1024
+
+
+class ScanView(APIView):
+    """
+    POST /api/catalog/scan/
+
+    Reads a medicine box or a prescription and returns the fields to prefill
+    the Add Medicine form with. Two ways in, both landing in the same parser:
+
+        multipart  image=<file>   photograph of the box or slip
+        json       {"text": "..."}  the label typed out, or text from any
+                                    other recogniser
+
+    Nothing is saved. The response is a *suggestion* — the app shows it in the
+    normal form and the user edits and confirms it before anything is created.
+
+    GET reports whether image recognition is available on this server, so the
+    app can offer the camera or ask for typing without having to guess.
+    """
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get(self, request):
+        return Response({"imageSupported": ocr_available()})
+
+    def post(self, request):
+        text = (request.data.get("text") or "").strip()
+
+        if not text:
+            image = request.FILES.get("image") or request.FILES.get("file")
+            if image is None:
+                return Response(
+                    {"detail": "Send an image file or the label text."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if image.size > MAX_IMAGE_BYTES:
+                return Response(
+                    {"detail": "That image is too large. Take the photo again at a lower size."},
+                    status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                )
+            try:
+                text = run_ocr(image.read())
+            except RuntimeError as exc:
+                # No engine on this machine. 503, not 500: the request was fine,
+                # the capability is missing — and the app offers typing instead.
+                return Response(
+                    {"detail": str(exc), "imageSupported": False},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+            except Exception:
+                return Response(
+                    {"detail": "That image could not be read. Try a sharper, straighter photo."},
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
+
+        result = extract(text)
+        return Response({**result, "imageSupported": ocr_available()})

@@ -7,7 +7,10 @@
     "icon": "./assets/images/icon.png",
     "scheme": "medicinenotifier",
     "userInterfaceStyle": "automatic",
-    "platforms": ["android", "web"],
+    "platforms": [
+      "android",
+      "web"
+    ],
     "web": {
       "output": "single",
       "bundler": "metro"
@@ -23,7 +26,8 @@
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.SCHEDULE_EXACT_ALARM",
-        "android.permission.VIBRATE"
+        "android.permission.VIBRATE",
+        "android.permission.CAMERA"
       ]
     },
     "plugins": [
@@ -41,6 +45,13 @@
         {
           "color": "#7B61D9",
           "defaultChannel": "medicine-reminders"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Medicine Notifier reads a photo of your medicine box or prescription so it can fill in the form for you.",
+          "cameraPermission": "Medicine Notifier uses the camera to read your medicine box or prescription and fill in the form for you."
         }
       ],
       "expo-audio",

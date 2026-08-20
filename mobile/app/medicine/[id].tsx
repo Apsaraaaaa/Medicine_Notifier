@@ -7,7 +7,7 @@ import { useApp, useTheme } from "../../context/AppContext";
 
 export default function EditMedicineScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { medicines } = useApp();
+  const { medicines, t } = useApp();
   const router = useRouter();
   const c = useTheme();
 
@@ -16,8 +16,8 @@ export default function EditMedicineScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: c.canvas }}>
       <AppHeader
-        title={medicine ? "Edit medicine" : "Medicine"}
-        subtitle={medicine ? "Set the dose and when to be reminded" : undefined}
+        title={t(medicine ? "form.editTitle" : "nav.medicines")}
+        subtitle={medicine ? t("form.subtitle") : undefined}
         onBack={() => router.back()}
       />
       {medicine ? (
@@ -26,8 +26,8 @@ export default function EditMedicineScreen() {
         // Reachable from a history entry whose medicine was deleted since.
         <EmptyState
           icon="search-off"
-          title="Medicine not found"
-          subtitle="It may have been deleted. Its recorded doses stay in your history."
+          title={t("form.notFound")}
+          subtitle={t("form.notFoundHint")}
         />
       )}
     </View>

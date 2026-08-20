@@ -4,6 +4,7 @@ import { useState } from "react";
 import { RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 
 import { isActive, MedicineCard } from "../../components/MedicineCard";
+import { PatientMedicines } from "../../components/patient/PatientMedicines";
 import {
   AppHeader,
   Button,
@@ -15,12 +16,19 @@ import {
   SheetAction,
 } from "../../components/ui";
 import { useApp, useTheme } from "../../context/AppContext";
+import type { TranslationKey } from "../../i18n";
 import type { Medicine } from "../../types";
 
 type Filter = "all" | "active" | "inactive";
 
+const FILTER_LABEL: Record<Filter, TranslationKey> = {
+  all: "common.all",
+  active: "status.active",
+  inactive: "status.inactive",
+};
+
 export default function MedicineListScreen() {
-  const { medicines, removeMedicine, refresh, refreshing } = useApp();
+  const { medicines, removeMedicine, refresh, refreshing, patientMode, t } = useApp();
   const c = useTheme();
   const router = useRouter();
 
@@ -56,15 +64,18 @@ export default function MedicineListScreen() {
     }
   };
 
+  // Patient Mode replaces this screen with the large add / edit / delete list.
+  if (patientMode) return <PatientMedicines />;
+
   return (
     <View style={{ flex: 1, backgroundColor: c.canvas }}>
       <AppHeader
-        title="Medicines"
-        subtitle={`${medicines.length} saved · ${activeCount} active`}
+        title={t("medicines.title")}
+        subtitle={t("medicines.subtitle", { total: medicines.length, active: activeCount })}
         right={
           <IconButton
             icon="add"
-            label="Add medicine"
+            label={t("nav.addMedicine")}
             color={c.brandInk}
             onPress={() => router.push("/medicine/new")}
           />
@@ -81,11 +92,11 @@ export default function MedicineListScreen() {
         {medicines.length === 0 ? (
           <EmptyState
             icon="medication"
-            title="No medicines yet"
-            subtitle="Add your first medicine to start receiving reminders."
+            title={t("medicines.empty")}
+            subtitle={t("medicines.emptyHint")}
             action={
               <Button icon="add" onPress={() => router.push("/medicine/new")}>
-                Add medicine
+                {t("nav.addMedicine")}
               </Button>
             }
           />
@@ -94,8 +105,8 @@ export default function MedicineListScreen() {
             <View style={[styles.search, { backgroundColor: c.surface, borderColor: c.line }]}>
               <MaterialIcons name="search" size={22} color={c.ink3} />
               <TextInput
-                accessibilityLabel="Search medicines"
-                placeholder="Search medicines"
+                accessibilityLabel={t("medicines.search")}
+                placeholder={t("medicines.search")}
                 placeholderTextColor={c.ink3}
                 value={query}
                 onChangeText={setQuery}
@@ -106,7 +117,7 @@ export default function MedicineListScreen() {
             <View style={styles.filters}>
               {(["all", "active", "inactive"] as Filter[]).map((f) => (
                 <FilterChip key={f} selected={filter === f} onPress={() => setFilter(f)}>
-                  {`${f === "all" ? "All" : f === "active" ? "Active" : "Inactive"} (${counts[f]})`}
+                  {`${t(FILTER_LABEL[f])} (${counts[f]})`}
                 </FilterChip>
               ))}
             </View>
@@ -114,9 +125,9 @@ export default function MedicineListScreen() {
             {list.length === 0 ? (
               <EmptyState
                 icon="search"
-                title="Nothing matches"
+                title={t("medicines.noMatch")}
                 subtitle={
-                  q ? `No medicines found for “${query}”.` : "No medicines in this filter yet."
+                  q ? t("medicines.noMatchFor", { query }) : t("medicines.noneInFilter")
                 }
               />
             ) : (
@@ -139,7 +150,7 @@ export default function MedicineListScreen() {
         <Sheet title={menuFor.name} onClose={() => setMenuFor(null)}>
           <SheetAction
             icon="edit"
-            label="Edit medicine"
+            label={t("medicines.editAction")}
             onPress={() => {
               const m = menuFor;
               setMenuFor(null);
@@ -148,7 +159,7 @@ export default function MedicineListScreen() {
           />
           <SheetAction
             icon="delete"
-            label="Delete medicine"
+            label={t("medicines.deleteAction")}
             tone="danger"
             onPress={() => {
               setConfirm(menuFor);
@@ -161,16 +172,16 @@ export default function MedicineListScreen() {
       {confirm && (
         <Modal
           tone="danger"
-          title={`Delete ${confirm.name}?`}
-          description="This will remove the medicine and its future reminders. Doses already recorded stay in your history."
+          title={t("medicines.deleteTitle", { name: confirm.name })}
+          description={t("medicines.deleteBody")}
           onClose={() => setConfirm(null)}
         >
           <View style={{ flexDirection: "row", gap: 12 }}>
             <Button variant="secondary" style={{ flex: 1 }} onPress={() => setConfirm(null)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button variant="danger" style={{ flex: 1 }} loading={deleting} onPress={doDelete}>
-              Delete
+              {t("common.delete")}
             </Button>
           </View>
         </Modal>

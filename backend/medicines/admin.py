@@ -31,11 +31,13 @@ class MedicineAdmin(admin.ModelAdmin):
         "frequency",
         "reminder_times",
         "swatch",
+        "routine",
         "start_date",
         "end_date",
         "is_active",
+        "is_critical",
     ]
-    list_filter = ["is_active", "start_date", "frequency"]
+    list_filter = ["is_active", "is_critical", "routine", "start_date", "frequency"]
     search_fields = ["name", "dosage", "user__email", "user__name"]
     autocomplete_fields = ["user"]
     date_hierarchy = "start_date"
@@ -43,8 +45,8 @@ class MedicineAdmin(admin.ModelAdmin):
     readonly_fields = ["created_at", "updated_at"]
     inlines = [HistoryEntryInline]
     fieldsets = (
-        (None, {"fields": ("user", "name", "dosage", "frequency", "is_active")}),
-        ("Schedule", {"fields": ("times", "start_date", "end_date")}),
+        (None, {"fields": ("user", "name", "dosage", "frequency", "is_active", "is_critical")}),
+        ("Schedule", {"fields": ("times", "start_date", "end_date", "routine", "meal_relation")}),
         ("Presentation", {"fields": ("color", "instructions")}),
         ("Timestamps", {"fields": ("created_at", "updated_at")}),
     )

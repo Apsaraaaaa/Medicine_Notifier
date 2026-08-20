@@ -47,6 +47,12 @@ class ServiceIndexView(APIView):
                     "refresh": "/api/auth/refresh/",
                     "medicines": "/api/medicines/",
                     "history": "/api/history/",
+                    "catalog": "/api/catalog/",
+                    "scan": "/api/catalog/scan/",
+                    "reports": "/api/reports/",
+                    "caregivers": "/api/caregivers/",
+                    "patients": "/api/caregivers/patients/",
+                    "alerts": "/api/caregivers/alerts/",
                 },
                 "note": (
                     "Endpoints other than register, login and refresh require "

@@ -2,7 +2,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { STATUS_META, type DoseState } from "../constants/theme";
-import { useTheme } from "../context/AppContext";
+import { useT, useTheme } from "../context/AppContext";
 import type { DoseSlot } from "../utils/schedule";
 import { formatTime12 } from "../utils/date";
 import { StatusBadge, T, type IconName } from "./ui";
@@ -14,6 +14,7 @@ export const STATUS_ICON: Record<DoseState, IconName> = {
   upcoming: "radio-button-unchecked",
   skipped: "remove-circle-outline",
   missed: "warning-amber",
+  snoozed: "snooze",
 };
 
 /**
@@ -32,8 +33,11 @@ function DoseRow({
   last: boolean;
 }) {
   const c = useTheme();
+  const t = useT();
   const meta = STATUS_META[slot.status];
-  const needsAnswer = slot.status === "due" || slot.status === "missed";
+  const label = t(meta.label);
+  const needsAnswer =
+    slot.status === "due" || slot.status === "missed" || slot.status === "snoozed";
 
   return (
     <View style={styles.row}>
@@ -50,7 +54,7 @@ function DoseRow({
       >
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${slot.medicine.name} at ${formatTime12(slot.time)} — ${meta.label}. Open medicine`}
+          accessibilityLabel={`${slot.medicine.name} · ${formatTime12(slot.time)} · ${label}`}
           onPress={onOpen}
           style={styles.rowMain}
         >
@@ -68,7 +72,7 @@ function DoseRow({
           {!needsAnswer && (
             <StatusBadge
               icon={STATUS_ICON[slot.status]}
-              label={meta.label}
+              label={label}
               bg={c[meta.soft]}
               fg={c[meta.ink]}
             />
@@ -88,7 +92,7 @@ function DoseRow({
           >
             <MaterialIcons name="notifications-active" size={17} color={c.onBrand} />
             <Text style={{ color: c.onBrand, fontSize: 15, fontWeight: "700" }}>
-              {slot.status === "due" ? "Take" : "Log"}
+              {t(slot.status === "missed" ? "dose.log" : "dose.take")}
             </Text>
           </Pressable>
         )}

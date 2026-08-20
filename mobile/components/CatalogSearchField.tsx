@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 
 import { RADIUS, TYPE } from "../constants/theme";
-import { useTheme } from "../context/AppContext";
+import { useT, useTheme } from "../context/AppContext";
 import { searchCatalog } from "../services/api";
 import type { CatalogMedicine } from "../types";
 import { Field, T } from "./ui";
@@ -33,6 +33,7 @@ export function CatalogSearchField({
   onPick: (item: CatalogMedicine) => void;
 }) {
   const c = useTheme();
+  const t = useT();
   const [results, setResults] = useState<CatalogMedicine[]>([]);
   const [loading, setLoading] = useState(false);
   const [offline, setOffline] = useState(false);
@@ -99,9 +100,9 @@ export function CatalogSearchField({
   return (
     <View>
       <Field
-        label="Medicine name"
+        label={t("form.name")}
         icon="search"
-        placeholder="Start typing, e.g. para"
+        placeholder={t("form.namePlaceholder")}
         autoCorrect={false}
         value={value}
         error={error}
@@ -115,7 +116,7 @@ export function CatalogSearchField({
           ) : value.length > 0 ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Clear medicine name"
+              accessibilityLabel={t("form.clearName")}
               onPress={() => {
                 typed.current = true;
                 onChangeText("");
@@ -135,14 +136,14 @@ export function CatalogSearchField({
             <View style={styles.message}>
               <MaterialIcons name="cloud-off" size={22} color={c.ink3} />
               <T size={TYPE.small} tone="ink3" style={{ flex: 1 }}>
-                Suggestions need the server. You can still type the name yourself.
+                {t("form.suggestOffline")}
               </T>
             </View>
           ) : results.length === 0 ? (
             <View style={styles.message}>
               <MaterialIcons name="info-outline" size={22} color={c.ink3} />
               <T size={TYPE.small} tone="ink3" style={{ flex: 1 }}>
-                Not in the catalogue — type the name as it appears on the box.
+                {t("form.suggestNone")}
               </T>
             </View>
           ) : (

@@ -3,7 +3,8 @@ Auth serializers.
 
 Two contracts the mobile app depends on, which must not drift:
 
-1. Auth responses are {"access", "refresh", "user"} with user = {id, name, email}.
+1. Auth responses are {"access", "refresh", "user"} with user = {id, name,
+   email, language}.
 2. `id` is rendered as a string, because mobile/types.ts declares `id: string`.
 """
 
@@ -27,7 +28,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "name", "email"]
+        fields = ["id", "name", "email", "language"]
         read_only_fields = ["id", "email"]
 
 

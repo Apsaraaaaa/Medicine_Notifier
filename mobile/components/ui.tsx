@@ -18,7 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 
-import { useTheme } from "../context/AppContext";
+import { useT, useTheme } from "../context/AppContext";
 import { RADIUS, SIZES, TYPE, type Palette } from "../constants/theme";
 
 export type IconName = ComponentProps<typeof MaterialIcons>["name"];
@@ -233,6 +233,7 @@ export function AppHeader({
   right?: ReactNode;
 }) {
   const c = useTheme();
+  const t = useT();
   const insets = useSafeAreaInsets();
   return (
     <View
@@ -241,7 +242,9 @@ export function AppHeader({
         { backgroundColor: c.surface, borderBottomColor: c.line, paddingTop: insets.top + 8 },
       ]}
     >
-      {onBack && <IconButton icon="arrow-back" label="Go back" onPress={onBack} color={c.ink} />}
+      {onBack && (
+        <IconButton icon="arrow-back" label={t("common.back")} onPress={onBack} color={c.ink} />
+      )}
       <View style={{ flex: 1, minWidth: 0 }}>
         <T size={TYPE.headline} weight="800" numberOfLines={1}>
           {title}
@@ -439,17 +442,24 @@ export function Toggle({
   label,
   on,
   onChange,
+  disabled,
 }: {
   label: string;
   on: boolean;
   onChange: (v: boolean) => void;
+  /** A switch the device cannot honour. It still reads out, it just cannot
+      be moved — flipping back on its own looks like a bug. */
+  disabled?: boolean;
 }) {
   const c = useTheme();
   return (
     <Switch
       accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled, checked: on }}
       value={on}
       onValueChange={onChange}
+      disabled={disabled}
+      style={disabled ? { opacity: 0.5 } : undefined}
       trackColor={{ false: c.line, true: c.brand }}
       thumbColor={c.surface}
     />
@@ -584,11 +594,12 @@ export function Modal({
   tone?: "default" | "danger";
 }) {
   const c = useTheme();
+  const t = useT();
   return (
     <RNModal transparent animationType="fade" visible onRequestClose={onClose}>
       <View style={[styles.scrim, { backgroundColor: c.scrim }]}>
         <Pressable
-          accessibilityLabel="Close"
+          accessibilityLabel={t("common.close")}
           style={StyleSheet.absoluteFill}
           onPress={onClose}
         />
@@ -632,12 +643,13 @@ export function Sheet({
   children: ReactNode;
 }) {
   const c = useTheme();
+  const t = useT();
   const insets = useSafeAreaInsets();
   return (
     <RNModal transparent animationType="slide" visible onRequestClose={onClose}>
       <View style={[styles.sheetScrim, { backgroundColor: c.scrim }]}>
         <Pressable
-          accessibilityLabel="Close"
+          accessibilityLabel={t("common.close")}
           style={StyleSheet.absoluteFill}
           onPress={onClose}
         />
@@ -656,7 +668,7 @@ export function Sheet({
             <T size={TYPE.title} weight="800" style={{ flex: 1 }} numberOfLines={1}>
               {title}
             </T>
-            <IconButton icon="close" label="Close" onPress={onClose} />
+            <IconButton icon="close" label={t("common.close")} onPress={onClose} />
           </View>
           <ScrollView style={{ maxHeight: 460 }}>{children}</ScrollView>
         </View>

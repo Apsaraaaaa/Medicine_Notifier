@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { useTheme } from "../context/AppContext";
+import { useT, useTheme } from "../context/AppContext";
 import type { Bucket } from "../utils/insights";
 import { prettyDate } from "../utils/date";
 import { T } from "./ui";
@@ -21,6 +21,7 @@ const MAX_BAR = 44;
  */
 export function HistoryChart({ buckets }: { buckets: Bucket[] }) {
   const c = useTheme();
+  const t = useT();
   const [selected, setSelected] = useState<number | null>(null);
   const active = selected !== null ? buckets[selected] : null;
 
@@ -33,8 +34,8 @@ export function HistoryChart({ buckets }: { buckets: Bucket[] }) {
           const label = b.days > 1 ? b.label : prettyDate(b.date);
           const summary =
             b.expected === 0
-              ? `${label}: nothing scheduled`
-              : `${label}: ${b.taken} of ${b.expected} doses taken`;
+              ? t("history.barNothing", { label })
+              : t("history.barDetail", { label, taken: b.taken, expected: b.expected });
 
           return (
             <Pressable
@@ -76,9 +77,16 @@ export function HistoryChart({ buckets }: { buckets: Bucket[] }) {
       <T size={15} tone="ink2" style={{ marginTop: 10, minHeight: 22 }}>
         {active
           ? active.expected === 0
-            ? `${active.days > 1 ? active.label : prettyDate(active.date)} · nothing scheduled`
-            : `${active.days > 1 ? active.label : prettyDate(active.date)} · ${active.taken} of ${active.expected} taken${active.missed > 0 ? `, ${active.missed} missed` : ""}`
-          : "Tap a bar for that day's detail"}
+            ? t("history.barNothing", {
+                label: active.days > 1 ? active.label : prettyDate(active.date),
+              })
+            : t("history.barDetail", {
+                label: active.days > 1 ? active.label : prettyDate(active.date),
+                taken: active.taken,
+                expected: active.expected,
+              }) +
+              (active.missed > 0 ? t("history.barMissed", { missed: active.missed }) : "")
+          : t("history.tapBar")}
       </T>
     </View>
   );

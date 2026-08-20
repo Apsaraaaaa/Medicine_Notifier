@@ -17,7 +17,7 @@ class UserAdmin(BaseUserAdmin):
         "is_active",
         "date_joined",
     ]
-    list_filter = ["is_staff", "is_superuser", "is_active"]
+    list_filter = ["is_staff", "is_superuser", "is_active", "language"]
     search_fields = ["email", "name"]
     date_hierarchy = "date_joined"
 
@@ -38,7 +38,7 @@ class UserAdmin(BaseUserAdmin):
         return obj.n_doses
     fieldsets = (
         (None, {"fields": ("email", "password")}),
-        ("Profile", {"fields": ("name",)}),
+        ("Profile", {"fields": ("name", "language")}),
         (
             "Permissions",
             {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")},

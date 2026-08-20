@@ -1,3 +1,6 @@
+import type { TranslationKey } from "../i18n";
+import type { MealRelation } from "../types";
+
 /**
  * Design tokens for the React Native app.
  *
@@ -143,38 +146,109 @@ export const MED_COLORS = [
   "#0E9594",
 ] as const;
 
-export type DoseState = "taken" | "due" | "upcoming" | "skipped" | "missed";
+export type DoseState = "taken" | "due" | "upcoming" | "skipped" | "missed" | "snoozed";
 
 /**
  * Dose / history status → the word and the colour roles every screen renders
  * it with. Status is never colour alone: each entry carries a label, and
  * callers pair it with the matching icon.
+ *
+ * `label` is a translation key rather than the word itself, so the same status
+ * reads correctly in both languages without any screen branching on language.
  */
 export const STATUS_META: Record<
   DoseState,
-  { label: string; soft: keyof Palette; ink: keyof Palette }
+  { label: TranslationKey; soft: keyof Palette; ink: keyof Palette }
 > = {
-  taken: { label: "Taken", soft: "okSoft", ink: "okInk" },
-  due: { label: "Due now", soft: "brandSoft", ink: "brandInk" },
-  upcoming: { label: "Upcoming", soft: "surface2", ink: "ink3" },
-  skipped: { label: "Skipped", soft: "warnSoft", ink: "warnInk" },
-  missed: { label: "Missed", soft: "badSoft", ink: "badInk" },
+  taken: { label: "status.taken", soft: "okSoft", ink: "okInk" },
+  due: { label: "status.due", soft: "brandSoft", ink: "brandInk" },
+  upcoming: { label: "status.upcoming", soft: "surface2", ink: "ink3" },
+  skipped: { label: "status.skipped", soft: "warnSoft", ink: "warnInk" },
+  missed: { label: "status.missed", soft: "badSoft", ink: "badInk" },
+  // Answered "later" rather than not answered at all. It shares the amber of
+  // `skipped` because both mean "deliberately not taken yet" — the icon and
+  // the word are what tell them apart, which is the rule everywhere here.
+  snoozed: { label: "status.snoozed", soft: "warnSoft", ink: "warnInk" },
 };
 
-export const FREQUENCIES = [
-  "Once a day",
-  "Twice a day",
-  "Three times a day",
-  "Every 6 hours",
-  "Weekly",
-  "As needed",
-] as const;
+/**
+ * The frequencies the form offers.
+ *
+ * `value` is what is stored and sent to the API — it stays English so a
+ * medicine saved in Nepali still reads the same in the database, the admin and
+ * an exported report. `label` is the key it is *shown* with.
+ */
+export const FREQUENCIES: { value: string; label: TranslationKey }[] = [
+  { value: "Once a day", label: "frequency.onceADay" },
+  { value: "Twice a day", label: "frequency.twiceADay" },
+  { value: "Three times a day", label: "frequency.threeTimesADay" },
+  { value: "Every 6 hours", label: "frequency.every6Hours" },
+  { value: "Weekly", label: "frequency.weekly" },
+  { value: "As needed", label: "frequency.asNeeded" },
+];
+
+/**
+ * Where a dose sits relative to a meal. "No preference" is first because it is
+ * what most medicines mean, and the form starts there.
+ */
+export const MEAL_RELATIONS: { key: MealRelation; label: TranslationKey }[] = [
+  { key: "none", label: "meal.none" },
+  { key: "before", label: "meal.before" },
+  { key: "with", label: "meal.with" },
+  { key: "after", label: "meal.after" },
+];
 
 /** Minutes a snoozed dose waits before it asks again. */
 export const SNOOZE_MINUTES = 15;
 
+/**
+ * The same, in Patient Mode.
+ *
+ * Shorter on purpose: the whole point of that mode is that the person using it
+ * should not have to hold anything in their head, and a quarter of an hour is
+ * long enough to forget why the phone went quiet.
+ */
+export const PATIENT_SNOOZE_MINUTES = 5;
+
 /** A dose with no answer this many minutes after its time counts as missed. */
 export const MISSED_AFTER_MINUTES = 60;
+
+/**
+ * Taken, but not on time. Matches LATE_AFTER_MINUTES in the backend's report
+ * module — the two must agree or the app and the report disagree about the
+ * same dose.
+ */
+export const LATE_AFTER_MINUTES = 15;
+
+/**
+ * Patient Mode sizing.
+ *
+ * A separate scale rather than a multiplier over TYPE/SIZES: only the two
+ * patient screens use it, and a global scale factor would have to be threaded
+ * through every component in the app and would reflow layouts nobody asked to
+ * change. Keeping it separate means Patient Mode cannot break the normal UI.
+ *
+ * The numbers are chosen for reading at arm's length without glasses, and for
+ * a hand that is not steady: nothing pressable is under 72dp.
+ */
+export const PATIENT_TYPE = {
+  small: 19,
+  body: 23,
+  bodyLg: 27,
+  title: 32,
+  headline: 38,
+  /** The single biggest thing on the screen: the time of the next dose. */
+  display: 60,
+} as const;
+
+export const PATIENT_SIZES = {
+  tap: 72,
+  button: 88,
+  icon: 34,
+  iconLg: 48,
+  /** The status dot on a dose row — big enough to read across a room. */
+  statusIcon: 40,
+} as const;
 
 export const APP_VERSION = "1.0.0";
 
@@ -183,4 +257,6 @@ export const STORAGE_KEYS = {
   refresh: "mn_refresh_token",
   user: "mn_user",
   settings: "mn_settings",
+  /** Alert ids already announced on this phone, so none is announced twice. */
+  seenAlerts: "mn_seen_alerts",
 };

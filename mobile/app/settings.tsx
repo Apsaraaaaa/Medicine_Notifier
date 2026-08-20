@@ -3,6 +3,8 @@ import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 
+import { LanguageSwitch } from "../components/LanguageSwitch";
+import { LANGUAGES } from "../i18n";
 import {
   AppHeader,
   Button,
@@ -13,9 +15,10 @@ import {
   T,
   Toggle,
 } from "../components/ui";
-import { RADIUS, SNOOZE_MINUTES } from "../constants/theme";
-import { useApp, useTheme } from "../context/AppContext";
+import { RADIUS } from "../constants/theme";
+import { useApp, useTheme, useVoiceStatus } from "../context/AppContext";
 import { startAlarm, stopAlarm } from "../notifications/alarm";
+
 import {
   NOTIFICATIONS_AVAILABLE,
   reminderStatus,
@@ -26,9 +29,13 @@ import {
 const MIN_PASSWORD = 8;
 
 export default function SettingsScreen() {
-  const { settings, updateSettings, changePassword, remindersScheduled } = useApp();
+  const { settings, updateSettings, changePassword, remindersScheduled, snoozeMinutes, t } =
+    useApp();
   const c = useTheme();
   const router = useRouter();
+  const voice = useVoiceStatus();
+  const languageName =
+    LANGUAGES.find((l) => l.key === settings.language)?.native ?? settings.language;
 
   const [testing, setTesting] = useState(false);
   const [oldPw, setOldPw] = useState("");
@@ -74,12 +81,15 @@ export default function SettingsScreen() {
   const submitPw = async () => {
     setMsg(null);
     if (newPw.length < MIN_PASSWORD) {
-      return setMsg({ ok: false, text: `New password must be ${MIN_PASSWORD}+ characters.` });
+      return setMsg({
+        ok: false,
+        text: t("settings.passwordTooShort", { count: MIN_PASSWORD }),
+      });
     }
     setBusy(true);
     try {
       await changePassword(oldPw, newPw);
-      setMsg({ ok: true, text: "Password updated." });
+      setMsg({ ok: true, text: t("settings.passwordUpdated") });
       setOldPw("");
       setNewPw("");
     } catch (e) {
@@ -98,8 +108,8 @@ export default function SettingsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: c.canvas }}>
       <AppHeader
-        title="Notifications"
-        subtitle="Reminders, sound & account"
+        title={t("settings.title")}
+        subtitle={t("settings.subtitle")}
         onBack={() => router.back()}
       />
 
@@ -107,7 +117,50 @@ export default function SettingsScreen() {
         contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
         keyboardShouldPersistTaps="handled"
       >
-        <SectionTitle>Reminders</SectionTitle>
+        <SectionTitle>{t("settings.patientMode")}</SectionTitle>
+        <Card style={{ marginBottom: 20, paddingVertical: 4 }}>
+          <SettingsRow
+            icon="accessibility-new"
+            label={t("settings.patientMode")}
+            description={t("settings.patientModeHint")}
+            control={
+              <Toggle
+                label={t("settings.patientMode")}
+                on={settings.patientMode}
+                onChange={(v) => updateSettings({ patientMode: v })}
+              />
+            }
+          />
+          <SettingsRow
+            icon="record-voice-over"
+            label={t("settings.voiceReminder")}
+            description={t(voice.hint, { language: languageName })}
+            control={
+              <Toggle
+                label={t("settings.voiceReminder")}
+                on={settings.voiceReminder && voice.available}
+                onChange={(v) => updateSettings({ voiceReminder: v })}
+                disabled={!voice.available}
+              />
+            }
+          />
+          <SettingsRow
+            icon="snooze"
+            label={t("settings.snoozeLength")}
+            description={t("settings.snoozeHint")}
+            value={t("settings.minutes", { count: snoozeMinutes })}
+          />
+        </Card>
+
+        <SectionTitle>{t("settings.language")}</SectionTitle>
+        <Card style={{ marginBottom: 20, gap: 10 }}>
+          <T size={15} tone="ink3">
+            {t("settings.languageHint")}
+          </T>
+          <LanguageSwitch />
+        </Card>
+
+        <SectionTitle>{t("settings.reminders")}</SectionTitle>
 
         {!NOTIFICATIONS_AVAILABLE && (
           <View
@@ -119,9 +172,7 @@ export default function SettingsScreen() {
             }}
           >
             <T size={15} weight="600" tone="warnInk">
-              Running in Expo Go, which cannot schedule notifications. Doses still ring while the
-              app is open. For reminders with the app closed, run a development build
-              (npx expo run:android).
+              {t("settings.expoGo")}
             </T>
           </View>
         )}
@@ -129,11 +180,11 @@ export default function SettingsScreen() {
         <Card style={{ marginBottom: 20, paddingVertical: 4 }}>
           <SettingsRow
             icon="notifications"
-            label="Notifications"
-            description="Schedule a reminder for every dose"
+            label={t("settings.notifications")}
+            description={t("settings.notificationsHint")}
             control={
               <Toggle
-                label="Notifications"
+                label={t("settings.notifications")}
                 on={settings.notifications}
                 onChange={setNotifications}
               />
@@ -141,33 +192,27 @@ export default function SettingsScreen() {
           />
           <SettingsRow
             icon="music-note"
-            label="Alarm sound"
-            description="Play a sound with the in-app reminder"
+            label={t("settings.alarmSound")}
+            description={t("settings.alarmSoundHint")}
             control={
               <Toggle
-                label="Alarm sound"
+                label={t("settings.alarmSound")}
                 on={settings.alarmSound}
                 onChange={(v) => updateSettings({ alarmSound: v })}
               />
             }
           />
           <SettingsRow
-            icon="snooze"
-            label="Snooze length"
-            description="How long a snoozed dose waits"
-            value={`${SNOOZE_MINUTES} min`}
-          />
-          <SettingsRow
             icon={allowed === false ? "notifications-off" : "alarm-on"}
-            label="Reminders on this phone"
+            label={t("settings.onThisPhone")}
             description={
               allowed === false
-                ? "Android is blocking notifications — tap to allow"
+                ? t("settings.blocked")
                 : remindersScheduled === 0
-                  ? "Nothing scheduled — add a medicine with a time"
-                  : "Set to ring even when the app is closed"
+                  ? t("settings.nothingScheduled")
+                  : t("settings.willRing")
             }
-            value={allowed === false ? "Off" : String(remindersScheduled)}
+            value={allowed === false ? t("common.off") : String(remindersScheduled)}
             onPress={
               allowed === false
                 ? () => requestPermission().then((ok) => setAllowed(ok))
@@ -176,15 +221,17 @@ export default function SettingsScreen() {
           />
         </Card>
 
-        <SectionTitle>Sound</SectionTitle>
+        <SectionTitle>{t("settings.sound")}</SectionTitle>
         <Card style={{ marginBottom: 20 }}>
           <SettingsRow
             icon="volume-up"
-            label="Volume"
-            description={`${Math.round(settings.volume * 100)}% of device volume`}
+            label={t("settings.volume")}
+            description={t("settings.volumeHint", {
+              percent: Math.round(settings.volume * 100),
+            })}
           />
           <Slider
-            accessibilityLabel="Alarm volume"
+            accessibilityLabel={t("settings.volume")}
             minimumValue={0}
             maximumValue={1}
             step={0.05}
@@ -201,15 +248,15 @@ export default function SettingsScreen() {
             onPress={testAlarm}
             style={{ marginTop: 12 }}
           >
-            {testing ? "Stop test alarm" : "Test alarm sound"}
+            {t(testing ? "settings.stopTest" : "settings.testAlarm")}
           </Button>
         </Card>
 
-        <SectionTitle>Account</SectionTitle>
+        <SectionTitle>{t("settings.account")}</SectionTitle>
         <Card style={{ gap: 16 }}>
-          <SettingsRow icon="lock" label="Change password" />
+          <SettingsRow icon="lock" label={t("settings.changePassword")} />
           <Field
-            label="Current password"
+            label={t("settings.currentPassword")}
             secureTextEntry
             autoCapitalize="none"
             autoComplete="current-password"
@@ -217,16 +264,16 @@ export default function SettingsScreen() {
             onChangeText={setOldPw}
           />
           <Field
-            label="New password"
+            label={t("settings.newPassword")}
             secureTextEntry
             autoCapitalize="none"
             autoComplete="new-password"
-            hint={`At least ${MIN_PASSWORD} characters`}
+            hint={t("auth.minChars", { count: MIN_PASSWORD })}
             value={newPw}
             onChangeText={setNewPw}
           />
           <Button loading={busy} onPress={submitPw}>
-            Update password
+            {t("settings.updatePassword")}
           </Button>
           {msg && (
             <View
